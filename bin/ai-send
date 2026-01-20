@@ -1,0 +1,315 @@
+#!/bin/bash
+# ai-send - Send a message to another agent
+# Usage: ai-send TARGET_AGENT_ID --subject "Subject" --body "Message body"
+
+set -e
+
+AI_CENTER_DIR="${HOME}/.ai-center"
+
+# Generate UUID
+generate_uuid() {
+    if command -v uuidgen &> /dev/null; then
+        uuidgen | tr '[:upper:]' '[:lower:]'
+    elif [ -f /proc/sys/kernel/random/uuid ]; then
+        cat /proc/sys/kernel/random/uuid
+    else
+        date +%s%N | sha256sum | head -c 32
+        echo ""
+    fi
+}
+
+# Get ISO 8601 timestamp
+get_timestamp() {
+    date -u +"%Y-%m-%dT%H:%M:%SZ"
+}
+
+show_help() {
+    cat << EOF
+Usage: ai-send TARGET_AGENT_ID [OPTIONS]
+
+Send a message to another agent's inbox.
+
+Arguments:
+  TARGET_AGENT_ID    The ID or name of the target agent
+
+Options:
+  -f, --from FROM_ID       Sender agent ID (optional)
+  -s, --subject SUBJECT    Message subject (required)
+  -b, --body BODY          Message body (required, or use --file)
+  --file FILE              Read body from file
+  -p, --priority PRIORITY  Priority: low|normal|high (default: normal)
+  -t, --type TYPE          Message type: request|info|query (default: request)
+  --context CONTEXT        Additional context section
+  --expected RESPONSE      Expected response description
+  --artifact PATH          Attach artifact file (screenshot, plan, etc.)
+  -h, --help               Show this help message
+
+Examples:
+  ai-send abc123 --subject "API Change" --body "Changed /auth to /v2/auth"
+  ai-send backend-agent -s "Question" -b "What's the DB schema?" -t query
+  ai-send abc123 --subject "Update" --file changes.md --priority high
+  ai-send abc123 --subject "Screenshot" --body "See attached" --artifact ./screenshot.png
+EOF
+}
+
+# Parse arguments
+TARGET=""
+FROM_ID=""
+SUBJECT=""
+BODY=""
+BODY_FILE=""
+PRIORITY="normal"
+MSG_TYPE="request"
+CONTEXT=""
+EXPECTED=""
+ARTIFACT=""
+
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        -f|--from)
+            FROM_ID="$2"
+            shift 2
+            ;;
+        -s|--subject)
+            SUBJECT="$2"
+            shift 2
+            ;;
+        -b|--body)
+            BODY="$2"
+            shift 2
+            ;;
+        --file)
+            BODY_FILE="$2"
+            shift 2
+            ;;
+        -p|--priority)
+            PRIORITY="$2"
+            shift 2
+            ;;
+        -t|--type)
+            MSG_TYPE="$2"
+            shift 2
+            ;;
+        --context)
+            CONTEXT="$2"
+            shift 2
+            ;;
+        --expected)
+            EXPECTED="$2"
+            shift 2
+            ;;
+        --artifact)
+            ARTIFACT="$2"
+            shift 2
+            ;;
+        -h|--help)
+            show_help
+            exit 0
+            ;;
+        -*)
+            echo "Unknown option: $1" >&2
+            show_help >&2
+            exit 1
+            ;;
+        *)
+            TARGET="$1"
+            shift
+            ;;
+    esac
+done
+
+# Validate required arguments
+if [ -z "${TARGET}" ]; then
+    echo "Error: TARGET_AGENT_ID is required" >&2
+    show_help >&2
+    exit 1
+fi
+
+if [ -z "${SUBJECT}" ]; then
+    echo "Error: --subject is required" >&2
+    show_help >&2
+    exit 1
+fi
+
+if [ -z "${BODY}" ] && [ -z "${BODY_FILE}" ]; then
+    echo "Error: --body or --file is required" >&2
+    show_help >&2
+    exit 1
+fi
+
+# Read body from file if specified
+if [ -n "${BODY_FILE}" ]; then
+    if [ ! -f "${BODY_FILE}" ]; then
+        echo "Error: File not found: ${BODY_FILE}" >&2
+        exit 1
+    fi
+    BODY=$(cat "${BODY_FILE}")
+fi
+
+# Handle artifact if specified
+ARTIFACT_ID=""
+ARTIFACT_PATH=""
+ARTIFACT_TYPE=""
+if [ -n "${ARTIFACT}" ]; then
+    if [ ! -f "${ARTIFACT}" ]; then
+        echo "Error: Artifact file not found: ${ARTIFACT}" >&2
+        exit 1
+    fi
+
+    # Create artifacts directory if it doesn't exist
+    ARTIFACTS_DIR="${AI_CENTER_DIR}/artifacts"
+    mkdir -p "${ARTIFACTS_DIR}"
+
+    # Generate artifact ID and determine type
+    ARTIFACT_ID=$(generate_uuid)
+    ARTIFACT_BASENAME=$(basename "${ARTIFACT}")
+    ARTIFACT_EXT="${ARTIFACT_BASENAME##*.}"
+
+    # Determine artifact type from extension
+    case "${ARTIFACT_EXT,,}" in
+        png|jpg|jpeg|gif|webp|bmp)
+            ARTIFACT_TYPE="screenshot"
+            ;;
+        md|markdown)
+            ARTIFACT_TYPE="plan"
+            ;;
+        pdf)
+            ARTIFACT_TYPE="document"
+            ;;
+        json)
+            ARTIFACT_TYPE="data"
+            ;;
+        txt|log)
+            ARTIFACT_TYPE="text"
+            ;;
+        *)
+            ARTIFACT_TYPE="file"
+            ;;
+    esac
+
+    # Copy artifact to artifacts directory
+    ARTIFACT_PATH="${ARTIFACTS_DIR}/${ARTIFACT_ID}.${ARTIFACT_EXT}"
+    cp "${ARTIFACT}" "${ARTIFACT_PATH}"
+fi
+
+# Resolve target agent (can be ID or name)
+TARGET_DIR=""
+TARGET_ID=""
+
+# First, try as direct ID
+if [ -d "${AI_CENTER_DIR}/agents/${TARGET}" ]; then
+    TARGET_DIR="${AI_CENTER_DIR}/agents/${TARGET}"
+    TARGET_ID="${TARGET}"
+else
+    # Search by name
+    for agent_dir in "${AI_CENTER_DIR}"/agents/*/; do
+        if [ -d "${agent_dir}" ]; then
+            metadata_file="${agent_dir}/metadata.json"
+            if [ -f "${metadata_file}" ]; then
+                name=$(grep -o '"name": "[^"]*"' "${metadata_file}" | head -1 | cut -d'"' -f4)
+                if [ "${name}" = "${TARGET}" ]; then
+                    TARGET_DIR="${agent_dir}"
+                    TARGET_ID=$(basename "${agent_dir}")
+                    break
+                fi
+            fi
+        fi
+    done
+fi
+
+if [ -z "${TARGET_DIR}" ]; then
+    echo "Error: Agent not found: ${TARGET}" >&2
+    echo "Use 'ai-list' to see available agents" >&2
+    exit 1
+fi
+
+# Ensure incoming/todo directory exists
+TODO_DIR="${TARGET_DIR}/incoming/todo"
+mkdir -p "${TODO_DIR}"
+
+# Generate message ID and filename
+MSG_ID=$(generate_uuid)
+TIMESTAMP=$(get_timestamp)
+# Create filename with timestamp prefix for sorting
+FILENAME=$(echo "${TIMESTAMP}" | tr ':' '-')_${MSG_ID:0:8}.md
+
+# Create message file with frontmatter
+{
+    echo "---"
+    echo "id: ${MSG_ID}"
+    echo "from: ${FROM_ID}"
+    echo "to: ${TARGET_ID}"
+    echo "priority: ${PRIORITY}"
+    echo "created: ${TIMESTAMP}"
+    echo "type: ${MSG_TYPE}"
+    if [ -n "${ARTIFACT_ID}" ]; then
+        echo "artifacts:"
+        echo "  - type: ${ARTIFACT_TYPE}"
+        echo "    id: ${ARTIFACT_ID}"
+        echo "    path: ${ARTIFACT_PATH}"
+    fi
+    echo "---"
+    echo ""
+    echo "# Subject: ${SUBJECT}"
+    echo ""
+} > "${TODO_DIR}/${FILENAME}"
+
+if [ -n "${CONTEXT}" ]; then
+    cat >> "${TODO_DIR}/${FILENAME}" << EOF
+## Context
+${CONTEXT}
+
+EOF
+fi
+
+# Add body section based on type
+case "${MSG_TYPE}" in
+    request)
+        cat >> "${TODO_DIR}/${FILENAME}" << EOF
+## Request
+${BODY}
+EOF
+        ;;
+    info)
+        cat >> "${TODO_DIR}/${FILENAME}" << EOF
+## Information
+${BODY}
+EOF
+        ;;
+    query)
+        cat >> "${TODO_DIR}/${FILENAME}" << EOF
+## Query
+${BODY}
+EOF
+        ;;
+    *)
+        cat >> "${TODO_DIR}/${FILENAME}" << EOF
+## Message
+${BODY}
+EOF
+        ;;
+esac
+
+if [ -n "${EXPECTED}" ]; then
+    cat >> "${TODO_DIR}/${FILENAME}" << EOF
+
+## Expected Response
+${EXPECTED}
+EOF
+fi
+
+if [ -n "${ARTIFACT_ID}" ]; then
+    cat >> "${TODO_DIR}/${FILENAME}" << EOF
+
+## Attached Artifact
+- **Type:** ${ARTIFACT_TYPE}
+- **ID:** ${ARTIFACT_ID}
+- **Path:** ${ARTIFACT_PATH}
+EOF
+fi
+
+echo "Message sent: ${FILENAME}"
+echo "To: ${TARGET_ID}"
+if [ -n "${ARTIFACT_ID}" ]; then
+    echo "Artifact: ${ARTIFACT_PATH}"
+fi

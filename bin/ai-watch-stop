@@ -1,0 +1,72 @@
+#!/bin/bash
+# ai-watch-stop - Stop the auto-poll daemon
+# Usage: ai-watch-stop
+
+set -e
+
+AI_CENTER_DIR="${HOME}/.ai-center"
+WATCHER_PID_FILE="${AI_CENTER_DIR}/watcher.pid"
+
+show_help() {
+    cat << EOF
+Usage: ai-watch-stop
+
+Stop the AI Center watcher daemon.
+
+Options:
+  -h, --help    Show this help message
+
+Examples:
+  ai-watch-stop
+EOF
+}
+
+# Parse arguments
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        -h|--help)
+            show_help
+            exit 0
+            ;;
+        *)
+            echo "Unknown option: $1" >&2
+            show_help >&2
+            exit 1
+            ;;
+    esac
+done
+
+# Check if PID file exists
+if [ ! -f "${WATCHER_PID_FILE}" ]; then
+    echo "No watcher daemon running (PID file not found)"
+    exit 0
+fi
+
+# Get PID
+pid=$(cat "${WATCHER_PID_FILE}")
+
+# Check if process is running
+if ! kill -0 "${pid}" 2>/dev/null; then
+    echo "Watcher daemon not running (stale PID file)"
+    rm -f "${WATCHER_PID_FILE}"
+    exit 0
+fi
+
+# Stop the daemon
+echo "Stopping watcher daemon (PID: ${pid})..."
+
+kill "${pid}" 2>/dev/null || true
+
+# Wait a moment for graceful shutdown
+sleep 1
+
+# Force kill if still running
+if kill -0 "${pid}" 2>/dev/null; then
+    echo "Forcing shutdown..."
+    kill -9 "${pid}" 2>/dev/null || true
+fi
+
+# Remove PID file
+rm -f "${WATCHER_PID_FILE}"
+
+echo "Watcher daemon stopped"

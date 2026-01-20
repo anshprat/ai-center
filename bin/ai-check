@@ -1,0 +1,239 @@
+#!/bin/bash
+# ai-check - Check for incoming messages in the todo queue
+# Usage: ai-check AGENT_ID [OPTIONS]
+
+set -e
+
+AI_CENTER_DIR="${HOME}/.ai-center"
+
+show_help() {
+    cat << EOF
+Usage: ai-check AGENT_ID [OPTIONS]
+
+Check for incoming messages in an agent's todo queue.
+
+Arguments:
+  AGENT_ID    The ID of the agent to check
+
+Options:
+  -q, --quiet      Only output message count
+  -j, --json       Output as JSON
+  -w, --wip        Also show messages in progress (wip)
+  -a, --all        Show all messages (todo + wip + done)
+  -h, --help       Show this help message
+
+Examples:
+  ai-check abc123             # List pending messages
+  ai-check abc123 -q          # Just show count
+  ai-check abc123 --json      # JSON output
+  ai-check abc123 --all       # Show all message history
+EOF
+}
+
+# Parse arguments
+AGENT_ID=""
+QUIET=false
+JSON=false
+SHOW_WIP=false
+SHOW_ALL=false
+
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        -q|--quiet)
+            QUIET=true
+            shift
+            ;;
+        -j|--json)
+            JSON=true
+            shift
+            ;;
+        -w|--wip)
+            SHOW_WIP=true
+            shift
+            ;;
+        -a|--all)
+            SHOW_ALL=true
+            shift
+            ;;
+        -h|--help)
+            show_help
+            exit 0
+            ;;
+        -*)
+            echo "Unknown option: $1" >&2
+            show_help >&2
+            exit 1
+            ;;
+        *)
+            AGENT_ID="$1"
+            shift
+            ;;
+    esac
+done
+
+if [ -z "${AGENT_ID}" ]; then
+    echo "Error: AGENT_ID is required" >&2
+    show_help >&2
+    exit 1
+fi
+
+AGENT_DIR="${AI_CENTER_DIR}/agents/${AGENT_ID}"
+
+# Validate agent exists
+if [ ! -d "${AGENT_DIR}" ]; then
+    echo "Error: Agent ${AGENT_ID} not found" >&2
+    exit 1
+fi
+
+TODO_DIR="${AGENT_DIR}/incoming/todo"
+WIP_DIR="${AGENT_DIR}/incoming/wip"
+DONE_DIR="${AGENT_DIR}/incoming/done"
+
+# Create directories if they don't exist
+mkdir -p "${TODO_DIR}" "${WIP_DIR}" "${DONE_DIR}"
+
+# Count messages
+todo_count=$(ls -1 "${TODO_DIR}" 2>/dev/null | wc -l | tr -d ' ')
+wip_count=$(ls -1 "${WIP_DIR}" 2>/dev/null | wc -l | tr -d ' ')
+done_count=$(ls -1 "${DONE_DIR}" 2>/dev/null | wc -l | tr -d ' ')
+
+# Quiet mode
+if [ "${QUIET}" = true ]; then
+    if [ "${SHOW_ALL}" = true ]; then
+        echo "${todo_count} pending, ${wip_count} in progress, ${done_count} done"
+    elif [ "${SHOW_WIP}" = true ]; then
+        echo "${todo_count} pending, ${wip_count} in progress"
+    else
+        echo "${todo_count}"
+    fi
+    exit 0
+fi
+
+# JSON output
+if [ "${JSON}" = true ]; then
+    echo '{"messages": ['
+
+    first=true
+    show_messages_json() {
+        local dir="$1"
+        local status="$2"
+
+        for msg in "${dir}"/*.md; do
+            if [ -f "${msg}" ]; then
+                filename=$(basename "${msg}")
+
+                # Extract metadata
+                if command -v python3 &> /dev/null; then
+                    python3 << PYTHON
+import re
+import json
+
+with open('${msg}', 'r') as f:
+    content = f.read()
+
+# Parse YAML frontmatter
+frontmatter = {}
+match = re.match(r'^---\n(.*?)\n---', content, re.DOTALL)
+if match:
+    for line in match.group(1).split('\n'):
+        if ':' in line:
+            key, val = line.split(':', 1)
+            frontmatter[key.strip()] = val.strip()
+
+# Extract subject
+subject_match = re.search(r'^# Subject: (.+)$', content, re.MULTILINE)
+subject = subject_match.group(1) if subject_match else ''
+
+data = {
+    'filename': '${filename}',
+    'status': '${status}',
+    'id': frontmatter.get('id', ''),
+    'from': frontmatter.get('from', ''),
+    'priority': frontmatter.get('priority', 'normal'),
+    'type': frontmatter.get('type', ''),
+    'created': frontmatter.get('created', ''),
+    'subject': subject
+}
+
+prefix = '' if ${first} == True else ','
+print(prefix + json.dumps(data))
+PYTHON
+                    first=false
+                fi
+            fi
+        done
+    }
+
+    show_messages_json "${TODO_DIR}" "todo"
+
+    if [ "${SHOW_WIP}" = true ] || [ "${SHOW_ALL}" = true ]; then
+        show_messages_json "${WIP_DIR}" "wip"
+    fi
+
+    if [ "${SHOW_ALL}" = true ]; then
+        show_messages_json "${DONE_DIR}" "done"
+    fi
+
+    echo ']}'
+    exit 0
+fi
+
+# Regular output
+show_messages() {
+    local dir="$1"
+    local status="$2"
+    local label="$3"
+
+    local count=$(ls -1 "${dir}"/*.md 2>/dev/null | wc -l | tr -d ' ')
+    if [ "${count}" -eq 0 ]; then
+        return
+    fi
+
+    echo ""
+    echo "${label} (${count}):"
+    printf "%-30s  %-8s  %-10s  %s\n" "FILENAME" "PRIORITY" "TYPE" "SUBJECT"
+    printf "%s\n" "$(printf '%.0s-' {1..80})"
+
+    for msg in "${dir}"/*.md; do
+        if [ -f "${msg}" ]; then
+            filename=$(basename "${msg}")
+
+            # Extract basic info using grep
+            priority=$(grep -m1 "^priority:" "${msg}" 2>/dev/null | cut -d':' -f2 | tr -d ' ' || echo "normal")
+            type=$(grep -m1 "^type:" "${msg}" 2>/dev/null | cut -d':' -f2 | tr -d ' ' || echo "")
+            subject=$(grep -m1 "^# Subject:" "${msg}" 2>/dev/null | sed 's/^# Subject: //' || echo "")
+
+            # Truncate values
+            filename_display="${filename:0:30}"
+            subject_display="${subject:0:35}"
+            if [ ${#subject} -gt 35 ]; then
+                subject_display="${subject_display}..."
+            fi
+
+            printf "%-30s  %-8s  %-10s  %s\n" "${filename_display}" "${priority}" "${type}" "${subject_display}"
+        fi
+    done
+}
+
+echo "Messages for agent: ${AGENT_ID}"
+
+if [ "${todo_count}" -eq 0 ] && [ "${wip_count}" -eq 0 ] && [ "${done_count}" -eq 0 ]; then
+    echo "No messages found"
+    exit 0
+fi
+
+# Always show todo
+show_messages "${TODO_DIR}" "todo" "Pending (todo)"
+
+# Show wip if requested
+if [ "${SHOW_WIP}" = true ] || [ "${SHOW_ALL}" = true ]; then
+    show_messages "${WIP_DIR}" "wip" "In Progress (wip)"
+fi
+
+# Show done if all requested
+if [ "${SHOW_ALL}" = true ]; then
+    show_messages "${DONE_DIR}" "done" "Completed (done)"
+fi
+
+echo ""
+echo "Summary: ${todo_count} pending, ${wip_count} in progress, ${done_count} completed"

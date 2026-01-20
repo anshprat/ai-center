@@ -1,0 +1,64 @@
+#!/bin/bash
+# ai-heartbeat - Update the heartbeat timestamp for an agent
+# Usage: ai-heartbeat AGENT_ID
+
+set -e
+
+AI_CENTER_DIR="${HOME}/.ai-center"
+
+# Get ISO 8601 timestamp
+get_timestamp() {
+    date -u +"%Y-%m-%dT%H:%M:%SZ"
+}
+
+show_help() {
+    cat << EOF
+Usage: ai-heartbeat AGENT_ID
+
+Update the last_heartbeat timestamp for an agent.
+
+Arguments:
+  AGENT_ID    The ID of the agent to update
+
+Example:
+  ai-heartbeat abc123-def456
+EOF
+}
+
+# Check arguments
+if [ $# -lt 1 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
+    show_help
+    [ "$1" = "-h" ] || [ "$1" = "--help" ] && exit 0
+    exit 1
+fi
+
+AGENT_ID="$1"
+AGENT_DIR="${AI_CENTER_DIR}/agents/${AGENT_ID}"
+METADATA_FILE="${AGENT_DIR}/metadata.json"
+
+# Validate agent exists
+if [ ! -f "${METADATA_FILE}" ]; then
+    echo "Error: Agent ${AGENT_ID} not found" >&2
+    exit 1
+fi
+
+TIMESTAMP=$(get_timestamp)
+
+# Update last_heartbeat in metadata.json
+if command -v python3 &> /dev/null; then
+    python3 << PYTHON
+import json
+with open('${METADATA_FILE}', 'r') as f:
+    metadata = json.load(f)
+metadata['last_heartbeat'] = '${TIMESTAMP}'
+with open('${METADATA_FILE}', 'w') as f:
+    json.dump(metadata, f, indent=2)
+PYTHON
+else
+    # Fallback using sed
+    TMP_FILE=$(mktemp)
+    sed "s/\"last_heartbeat\": \"[^\"]*\"/\"last_heartbeat\": \"${TIMESTAMP}\"/" "${METADATA_FILE}" > "${TMP_FILE}"
+    mv "${TMP_FILE}" "${METADATA_FILE}"
+fi
+
+echo "Heartbeat updated: ${TIMESTAMP}"

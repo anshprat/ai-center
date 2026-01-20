@@ -1,0 +1,166 @@
+#!/bin/bash
+# ai-cleanup - Remove stale agents (no heartbeat for >1 hour)
+# Usage: ai-cleanup [OPTIONS]
+
+set -e
+
+AI_CENTER_DIR="${HOME}/.ai-center"
+REGISTRY_FILE="${AI_CENTER_DIR}/registry.json"
+
+# Default stale threshold: 1 hour (3600 seconds)
+STALE_THRESHOLD=3600
+DRY_RUN=false
+FORCE=false
+
+show_help() {
+    cat << EOF
+Usage: ai-cleanup [OPTIONS]
+
+Remove stale agents from the AI Center.
+
+Options:
+  -t, --threshold SECONDS   Stale threshold in seconds (default: 3600 = 1 hour)
+  -n, --dry-run            Show what would be removed without removing
+  -f, --force              Remove without confirmation
+  -h, --help               Show this help message
+
+Examples:
+  ai-cleanup                    # Remove agents stale > 1 hour
+  ai-cleanup -t 1800            # Remove agents stale > 30 minutes
+  ai-cleanup -n                 # Dry run - show what would be removed
+EOF
+}
+
+# Parse arguments
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        -t|--threshold)
+            STALE_THRESHOLD="$2"
+            shift 2
+            ;;
+        -n|--dry-run)
+            DRY_RUN=true
+            shift
+            ;;
+        -f|--force)
+            FORCE=true
+            shift
+            ;;
+        -h|--help)
+            show_help
+            exit 0
+            ;;
+        *)
+            echo "Unknown option: $1" >&2
+            show_help >&2
+            exit 1
+            ;;
+    esac
+done
+
+# Ensure AI Center exists
+if [ ! -d "${AI_CENTER_DIR}/agents" ]; then
+    echo "No agents found (AI Center not initialized)"
+    exit 0
+fi
+
+# Calculate time difference in seconds
+time_diff_seconds() {
+    local timestamp="$1"
+    local now_epoch=$(date -u +%s)
+
+    # Parse ISO 8601 timestamp (UTC)
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        # macOS - need to set TZ=UTC for proper parsing
+        local ts_epoch=$(TZ=UTC date -j -f "%Y-%m-%dT%H:%M:%SZ" "${timestamp}" +%s 2>/dev/null || echo 0)
+    else
+        # Linux
+        local ts_epoch=$(date -u -d "${timestamp}" +%s 2>/dev/null || echo 0)
+    fi
+
+    echo $((now_epoch - ts_epoch))
+}
+
+# Format duration
+format_duration() {
+    local seconds=$1
+    if [ $seconds -lt 60 ]; then
+        echo "${seconds}s"
+    elif [ $seconds -lt 3600 ]; then
+        echo "$((seconds / 60))m"
+    elif [ $seconds -lt 86400 ]; then
+        echo "$((seconds / 3600))h $((seconds % 3600 / 60))m"
+    else
+        echo "$((seconds / 86400))d $((seconds % 86400 / 3600))h"
+    fi
+}
+
+stale_agents=()
+stale_names=()
+stale_ages=()
+
+# Find stale agents
+for agent_dir in "${AI_CENTER_DIR}"/agents/*/; do
+    if [ -d "${agent_dir}" ]; then
+        agent_id=$(basename "${agent_dir}")
+        metadata_file="${agent_dir}/metadata.json"
+
+        if [ -f "${metadata_file}" ]; then
+            # Get heartbeat timestamp
+            heartbeat=$(grep -o '"last_heartbeat": "[^"]*"' "${metadata_file}" | head -1 | cut -d'"' -f4)
+            name=$(grep -o '"name": "[^"]*"' "${metadata_file}" | head -1 | cut -d'"' -f4)
+
+            if [ -n "${heartbeat}" ]; then
+                age=$(time_diff_seconds "${heartbeat}")
+
+                if [ ${age} -gt ${STALE_THRESHOLD} ]; then
+                    stale_agents+=("${agent_id}")
+                    stale_names+=("${name}")
+                    stale_ages+=("${age}")
+                fi
+            fi
+        fi
+    fi
+done
+
+if [ ${#stale_agents[@]} -eq 0 ]; then
+    echo "No stale agents found (threshold: $(format_duration ${STALE_THRESHOLD}))"
+    exit 0
+fi
+
+echo "Found ${#stale_agents[@]} stale agent(s):"
+echo ""
+for i in "${!stale_agents[@]}"; do
+    printf "  %-36s  %-20s  (last seen: %s ago)\n" \
+        "${stale_agents[$i]}" \
+        "${stale_names[$i]}" \
+        "$(format_duration ${stale_ages[$i]})"
+done
+echo ""
+
+# Dry run exits here
+if [ "${DRY_RUN}" = true ]; then
+    echo "[Dry run - no agents removed]"
+    exit 0
+fi
+
+# Confirm unless forced
+if [ "${FORCE}" = false ]; then
+    read -p "Remove these agents? [y/N] " confirm
+    if [[ ! "${confirm}" =~ ^[Yy] ]]; then
+        echo "Cancelled"
+        exit 0
+    fi
+fi
+
+# Remove stale agents
+removed=0
+for agent_id in "${stale_agents[@]}"; do
+    if ai-deregister "${agent_id}" 2>/dev/null; then
+        ((removed++))
+    else
+        echo "Warning: Failed to remove ${agent_id}" >&2
+    fi
+done
+
+echo "Removed ${removed} stale agent(s)"

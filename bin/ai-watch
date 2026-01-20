@@ -1,0 +1,197 @@
+#!/bin/bash
+# ai-watch - Auto-poll daemon that watches for new messages
+# Usage: ai-watch AGENT_ID [OPTIONS]
+
+set -e
+
+AI_CENTER_DIR="${HOME}/.ai-center"
+WATCHER_PID_FILE="${AI_CENTER_DIR}/watcher.pid"
+
+# Default poll interval: 5 seconds
+POLL_INTERVAL=5
+DAEMON=false
+
+show_help() {
+    cat << EOF
+Usage: ai-watch AGENT_ID [OPTIONS]
+
+Start watching for new messages in an agent's todo queue.
+
+Arguments:
+  AGENT_ID    The ID of the agent to watch
+
+Options:
+  -i, --interval SECONDS   Poll interval in seconds (default: 5)
+  -d, --daemon             Run in background as daemon
+  -h, --help               Show this help message
+
+In foreground mode, press Ctrl+C to stop watching.
+In daemon mode, use 'ai-watch-stop' to stop the watcher.
+
+Examples:
+  ai-watch abc123                     # Watch in foreground
+  ai-watch abc123 -i 10               # Poll every 10 seconds
+  ai-watch abc123 --daemon            # Run as background daemon
+EOF
+}
+
+# Parse arguments
+AGENT_ID=""
+
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        -i|--interval)
+            POLL_INTERVAL="$2"
+            shift 2
+            ;;
+        -d|--daemon)
+            DAEMON=true
+            shift
+            ;;
+        -h|--help)
+            show_help
+            exit 0
+            ;;
+        -*)
+            echo "Unknown option: $1" >&2
+            show_help >&2
+            exit 1
+            ;;
+        *)
+            AGENT_ID="$1"
+            shift
+            ;;
+    esac
+done
+
+if [ -z "${AGENT_ID}" ]; then
+    echo "Error: AGENT_ID is required" >&2
+    show_help >&2
+    exit 1
+fi
+
+AGENT_DIR="${AI_CENTER_DIR}/agents/${AGENT_ID}"
+TODO_DIR="${AGENT_DIR}/incoming/todo"
+
+# Validate agent exists
+if [ ! -d "${AGENT_DIR}" ]; then
+    echo "Error: Agent ${AGENT_ID} not found" >&2
+    exit 1
+fi
+
+# Ensure todo directory exists
+mkdir -p "${TODO_DIR}"
+
+# Check if already watching
+if [ -f "${WATCHER_PID_FILE}" ]; then
+    existing_pid=$(cat "${WATCHER_PID_FILE}")
+    if kill -0 "${existing_pid}" 2>/dev/null; then
+        echo "Warning: Watcher already running (PID: ${existing_pid})" >&2
+        echo "Use 'ai-watch-stop' to stop it first" >&2
+        exit 1
+    fi
+fi
+
+# The watch loop
+watch_loop() {
+    local last_count=0
+    local last_files=""
+
+    echo "Watching for messages: ${AGENT_ID}"
+    echo "Poll interval: ${POLL_INTERVAL}s"
+    echo "Press Ctrl+C to stop"
+    echo ""
+
+    while true; do
+        # Get current message files
+        current_files=$(ls -1 "${TODO_DIR}"/*.md 2>/dev/null | sort || echo "")
+        current_count=$(echo "${current_files}" | grep -c . || echo 0)
+
+        # Check for new messages
+        if [ "${current_count}" -gt "${last_count}" ]; then
+            # Find new files
+            new_files=$(comm -13 <(echo "${last_files}" | sort) <(echo "${current_files}" | sort) 2>/dev/null || echo "${current_files}")
+
+            echo ""
+            echo "$(date '+%Y-%m-%d %H:%M:%S') - NEW MESSAGE(S) RECEIVED!"
+            echo "=========================================="
+
+            for msg in ${new_files}; do
+                if [ -f "${msg}" ]; then
+                    filename=$(basename "${msg}")
+                    subject=$(grep -m1 "^# Subject:" "${msg}" 2>/dev/null | sed 's/^# Subject: //' || echo "")
+                    from=$(grep -m1 "^from:" "${msg}" 2>/dev/null | cut -d':' -f2 | tr -d ' ' || echo "")
+                    priority=$(grep -m1 "^priority:" "${msg}" 2>/dev/null | cut -d':' -f2 | tr -d ' ' || echo "normal")
+
+                    echo "  File: ${filename}"
+                    [ -n "${from}" ] && echo "  From: ${from}"
+                    echo "  Subject: ${subject}"
+                    [ "${priority}" = "high" ] && echo "  Priority: HIGH!"
+                    echo ""
+                fi
+            done
+
+            echo "Use 'ai-process ${AGENT_ID} <filename>' to start processing"
+            echo ""
+
+            # Terminal bell (if supported)
+            printf '\a'
+        fi
+
+        last_count=${current_count}
+        last_files="${current_files}"
+
+        sleep "${POLL_INTERVAL}"
+    done
+}
+
+# Daemon mode
+if [ "${DAEMON}" = true ]; then
+    echo "Starting watcher daemon..."
+
+    # Fork to background
+    (
+        # Redirect stdout/stderr to log file
+        exec >> "${AI_CENTER_DIR}/watcher.log" 2>&1
+
+        echo "$(date '+%Y-%m-%d %H:%M:%S') - Watcher started for agent: ${AGENT_ID}"
+
+        last_count=0
+        last_files=""
+
+        while true; do
+            # Get current message files
+            current_files=$(ls -1 "${TODO_DIR}"/*.md 2>/dev/null | sort || echo "")
+            current_count=$(echo "${current_files}" | grep -c . || echo 0)
+
+            # Check for new messages
+            if [ "${current_count}" -gt "${last_count}" ]; then
+                echo "$(date '+%Y-%m-%d %H:%M:%S') - New messages detected: $((current_count - last_count))"
+            fi
+
+            last_count=${current_count}
+            last_files="${current_files}"
+
+            sleep "${POLL_INTERVAL}"
+        done
+    ) &
+
+    daemon_pid=$!
+    echo "${daemon_pid}" > "${WATCHER_PID_FILE}"
+
+    echo "Watcher daemon started (PID: ${daemon_pid})"
+    echo "Log file: ${AI_CENTER_DIR}/watcher.log"
+    echo "Use 'ai-watch-stop' to stop the daemon"
+    exit 0
+fi
+
+# Foreground mode - handle Ctrl+C gracefully
+cleanup() {
+    echo ""
+    echo "Stopping watcher..."
+    exit 0
+}
+
+trap cleanup SIGINT SIGTERM
+
+watch_loop

@@ -1,0 +1,206 @@
+#!/bin/bash
+# ai-list - List all registered agents
+# Usage: ai-list [OPTIONS]
+
+set -e
+
+AI_CENTER_DIR="${HOME}/.ai-center"
+REGISTRY_FILE="${AI_CENTER_DIR}/registry.json"
+
+# Options
+SHOW_ALL=false
+SHOW_JSON=false
+SHOW_VERBOSE=false
+
+show_help() {
+    cat << EOF
+Usage: ai-list [OPTIONS]
+
+List all registered agents in the AI Center.
+
+Options:
+  -a, --all       Show all agents including completed/stale
+  -j, --json      Output as JSON
+  -v, --verbose   Show detailed information
+  -h, --help      Show this help message
+
+Examples:
+  ai-list              # List active agents
+  ai-list -a           # List all agents
+  ai-list -v           # Verbose output
+  ai-list -j           # JSON output
+EOF
+}
+
+# Parse arguments
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        -a|--all)
+            SHOW_ALL=true
+            shift
+            ;;
+        -j|--json)
+            SHOW_JSON=true
+            shift
+            ;;
+        -v|--verbose)
+            SHOW_VERBOSE=true
+            shift
+            ;;
+        -h|--help)
+            show_help
+            exit 0
+            ;;
+        *)
+            echo "Unknown option: $1" >&2
+            show_help >&2
+            exit 1
+            ;;
+    esac
+done
+
+# Ensure AI Center exists
+if [ ! -d "${AI_CENTER_DIR}/agents" ]; then
+    echo "No agents found (AI Center not initialized)" >&2
+    exit 0
+fi
+
+# Calculate time difference in seconds
+time_diff_seconds() {
+    local timestamp="$1"
+    local now_epoch=$(date -u +%s)
+
+    # Parse ISO 8601 timestamp (UTC)
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        # macOS - need to set TZ=UTC for proper parsing
+        local ts_epoch=$(TZ=UTC date -j -f "%Y-%m-%dT%H:%M:%SZ" "${timestamp}" +%s 2>/dev/null || echo 0)
+    else
+        # Linux
+        local ts_epoch=$(date -u -d "${timestamp}" +%s 2>/dev/null || echo 0)
+    fi
+
+    echo $((now_epoch - ts_epoch))
+}
+
+# Format duration
+format_duration() {
+    local seconds=$1
+    if [ $seconds -lt 60 ]; then
+        echo "${seconds}s ago"
+    elif [ $seconds -lt 3600 ]; then
+        echo "$((seconds / 60))m ago"
+    elif [ $seconds -lt 86400 ]; then
+        echo "$((seconds / 3600))h ago"
+    else
+        echo "$((seconds / 86400))d ago"
+    fi
+}
+
+# Output JSON format
+if [ "${SHOW_JSON}" = true ]; then
+    if command -v python3 &> /dev/null; then
+        python3 << 'PYTHON'
+import json
+import os
+import sys
+
+ai_center = os.path.expanduser('~/.ai-center')
+agents_dir = os.path.join(ai_center, 'agents')
+show_all = 'SHOW_ALL' in os.environ and os.environ.get('SHOW_ALL') == 'true'
+
+agents = []
+if os.path.isdir(agents_dir):
+    for agent_id in os.listdir(agents_dir):
+        metadata_file = os.path.join(agents_dir, agent_id, 'metadata.json')
+        if os.path.isfile(metadata_file):
+            with open(metadata_file, 'r') as f:
+                metadata = json.load(f)
+                if show_all or metadata.get('state') not in ['completed']:
+                    agents.append(metadata)
+
+print(json.dumps({'agents': agents}, indent=2))
+PYTHON
+    else
+        echo '{"agents": []}'
+    fi
+    exit 0
+fi
+
+# Regular output
+agent_count=0
+printf "%-36s  %-15s  %-10s  %-8s  %s\n" "ID" "NAME" "STATE" "HEARTBEAT" "TASK"
+printf "%s\n" "$(printf '%.0s-' {1..100})"
+
+for agent_dir in "${AI_CENTER_DIR}"/agents/*/; do
+    if [ -d "${agent_dir}" ]; then
+        agent_id=$(basename "${agent_dir}")
+        metadata_file="${agent_dir}/metadata.json"
+
+        if [ -f "${metadata_file}" ]; then
+            if command -v python3 &> /dev/null; then
+                # Use Python for reliable JSON parsing
+                read -r name state heartbeat task progress < <(python3 << PYTHON
+import json
+with open('${metadata_file}', 'r') as f:
+    m = json.load(f)
+print(f"{m.get('name', 'unknown')}\t{m.get('state', 'unknown')}\t{m.get('last_heartbeat', '')}\t{m.get('current_task', '')}\t{m.get('progress_percent', 0)}")
+PYTHON
+)
+            else
+                # Fallback using grep
+                name=$(grep -o '"name": "[^"]*"' "${metadata_file}" | head -1 | cut -d'"' -f4)
+                state=$(grep -o '"state": "[^"]*"' "${metadata_file}" | head -1 | cut -d'"' -f4)
+                heartbeat=$(grep -o '"last_heartbeat": "[^"]*"' "${metadata_file}" | head -1 | cut -d'"' -f4)
+                task=$(grep -o '"current_task": "[^"]*"' "${metadata_file}" | head -1 | cut -d'"' -f4)
+                progress=$(grep -o '"progress_percent": [0-9]*' "${metadata_file}" | head -1 | grep -o '[0-9]*')
+            fi
+
+            # Skip completed agents unless --all
+            if [ "${SHOW_ALL}" = false ] && [ "${state}" = "completed" ]; then
+                continue
+            fi
+
+            # Calculate heartbeat age
+            if [ -n "${heartbeat}" ]; then
+                hb_age=$(time_diff_seconds "${heartbeat}")
+                hb_display=$(format_duration ${hb_age})
+            else
+                hb_display="unknown"
+            fi
+
+            # Truncate long values
+            name_display="${name:0:15}"
+            task_display="${task:0:40}"
+            if [ ${#task} -gt 40 ]; then
+                task_display="${task_display}..."
+            fi
+
+            printf "%-36s  %-15s  %-10s  %-8s  %s\n" "${agent_id:0:36}" "${name_display}" "${state}" "${hb_display}" "${task_display}"
+
+            # Verbose output
+            if [ "${SHOW_VERBOSE}" = true ]; then
+                working_dir=$(grep -o '"working_directory": "[^"]*"' "${metadata_file}" | head -1 | cut -d'"' -f4)
+                git_branch=$(grep -o '"git_branch": "[^"]*"' "${metadata_file}" | head -1 | cut -d'"' -f4)
+
+                printf "  Working dir: %s\n" "${working_dir}"
+                [ -n "${git_branch}" ] && printf "  Git branch: %s\n" "${git_branch}"
+                [ -n "${progress}" ] && printf "  Progress: %s%%\n" "${progress}"
+
+                # Count pending messages
+                todo_count=$(ls -1 "${agent_dir}/incoming/todo/" 2>/dev/null | wc -l | tr -d ' ')
+                wip_count=$(ls -1 "${agent_dir}/incoming/wip/" 2>/dev/null | wc -l | tr -d ' ')
+                printf "  Messages: %s pending, %s in progress\n" "${todo_count}" "${wip_count}"
+                echo ""
+            fi
+
+            ((agent_count++))
+        fi
+    fi
+done
+
+if [ ${agent_count} -eq 0 ]; then
+    echo "No active agents found"
+    if [ "${SHOW_ALL}" = false ]; then
+        echo "(Use -a to show completed agents)"
+    fi
+fi

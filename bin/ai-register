@@ -1,0 +1,250 @@
+#!/bin/bash
+# ai-register - Register a new agent in the AI Center
+# Usage: ai-register --name "agent-name" --command "task description" [options]
+
+set -e
+
+AI_CENTER_DIR="${HOME}/.ai-center"
+REGISTRY_FILE="${AI_CENTER_DIR}/registry.json"
+
+# Default values
+AGENT_NAME=""
+AGENT_COMMAND=""
+AGENT_STATE="active"
+AGENT_TAGS=""
+AGENT_CAPABILITIES=""
+AGENT_MODEL=""
+AGENT_SESSION_ID=""
+AGENT_PARENT=""
+
+# Generate UUID (works on macOS and Linux)
+generate_uuid() {
+    if command -v uuidgen &> /dev/null; then
+        uuidgen | tr '[:upper:]' '[:lower:]'
+    elif [ -f /proc/sys/kernel/random/uuid ]; then
+        cat /proc/sys/kernel/random/uuid
+    else
+        # Fallback: generate pseudo-random ID
+        date +%s%N | sha256sum | head -c 32
+        echo ""
+    fi
+}
+
+# Get ISO 8601 timestamp
+get_timestamp() {
+    date -u +"%Y-%m-%dT%H:%M:%SZ"
+}
+
+# Get git branch if in a git repo
+get_git_branch() {
+    git rev-parse --abbrev-ref HEAD 2>/dev/null || echo ""
+}
+
+show_help() {
+    cat << EOF
+Usage: ai-register [OPTIONS]
+
+Register a new agent in the AI Center.
+
+Options:
+  -n, --name NAME           Agent name (required)
+  -c, --command COMMAND     Task/command being executed (required)
+  -s, --state STATE         Initial state: active|idle|waiting (default: active)
+  -t, --tags TAGS           Comma-separated tags (e.g., "backend,api")
+  --capabilities CAPS       Comma-separated capabilities (e.g., "python,typescript")
+  --model MODEL             AI model being used (e.g., "claude-opus-4-5")
+  --session-id ID           Claude Code session ID
+  --parent AGENT_ID         Parent agent ID (for hierarchies)
+  -h, --help                Show this help message
+
+Output:
+  Prints the new agent ID to stdout on success.
+
+Example:
+  AGENT_ID=\$(ai-register --name "backend-refactor" --command "Refactoring auth module")
+  echo "Registered as: \$AGENT_ID"
+EOF
+}
+
+# Parse arguments
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        -n|--name)
+            AGENT_NAME="$2"
+            shift 2
+            ;;
+        -c|--command)
+            AGENT_COMMAND="$2"
+            shift 2
+            ;;
+        -s|--state)
+            AGENT_STATE="$2"
+            shift 2
+            ;;
+        -t|--tags)
+            AGENT_TAGS="$2"
+            shift 2
+            ;;
+        --capabilities)
+            AGENT_CAPABILITIES="$2"
+            shift 2
+            ;;
+        --model)
+            AGENT_MODEL="$2"
+            shift 2
+            ;;
+        --session-id)
+            AGENT_SESSION_ID="$2"
+            shift 2
+            ;;
+        --parent)
+            AGENT_PARENT="$2"
+            shift 2
+            ;;
+        -h|--help)
+            show_help
+            exit 0
+            ;;
+        *)
+            echo "Unknown option: $1" >&2
+            show_help >&2
+            exit 1
+            ;;
+    esac
+done
+
+# Validate required arguments
+if [ -z "${AGENT_NAME}" ]; then
+    echo "Error: --name is required" >&2
+    show_help >&2
+    exit 1
+fi
+
+if [ -z "${AGENT_COMMAND}" ]; then
+    echo "Error: --command is required" >&2
+    show_help >&2
+    exit 1
+fi
+
+# Ensure AI Center directory exists
+if [ ! -d "${AI_CENTER_DIR}" ]; then
+    echo "Error: AI Center not installed. Run install.sh first." >&2
+    exit 1
+fi
+
+# Generate agent ID
+AGENT_ID=$(generate_uuid)
+AGENT_DIR="${AI_CENTER_DIR}/agents/${AGENT_ID}"
+TIMESTAMP=$(get_timestamp)
+WORKING_DIR=$(pwd)
+GIT_BRANCH=$(get_git_branch)
+AGENT_PID=$$
+
+# Create agent directory structure
+mkdir -p "${AGENT_DIR}/incoming/todo"
+mkdir -p "${AGENT_DIR}/incoming/wip"
+mkdir -p "${AGENT_DIR}/incoming/done"
+
+# Convert comma-separated tags to JSON array
+format_array() {
+    local input="$1"
+    if [ -z "${input}" ]; then
+        echo "[]"
+    else
+        echo "[$(echo "${input}" | sed 's/,/","/g' | sed 's/^/"/;s/$/"/')]"
+    fi
+}
+
+TAGS_JSON=$(format_array "${AGENT_TAGS}")
+CAPS_JSON=$(format_array "${AGENT_CAPABILITIES}")
+
+# Create metadata.json
+cat > "${AGENT_DIR}/metadata.json" << EOF
+{
+  "id": "${AGENT_ID}",
+  "name": "${AGENT_NAME}",
+  "working_directory": "${WORKING_DIR}",
+  "command": "${AGENT_COMMAND}",
+  "start_time": "${TIMESTAMP}",
+  "last_heartbeat": "${TIMESTAMP}",
+  "state": "${AGENT_STATE}",
+  "pid": ${AGENT_PID},
+  "current_task": "${AGENT_COMMAND}",
+  "git_branch": "${GIT_BRANCH}",
+  "files_in_progress": [],
+  "progress_percent": 0,
+  "tags": ${TAGS_JSON},
+  "capabilities": ${CAPS_JSON},
+  "model": "${AGENT_MODEL}",
+  "session_id": "${AGENT_SESSION_ID}",
+  "parent_agent": "${AGENT_PARENT}"
+}
+EOF
+
+# Update registry.json (using a lock directory for safety - works on macOS and Linux)
+LOCK_DIR="${AI_CENTER_DIR}/.registry.lock"
+
+# Simple directory-based locking (mkdir is atomic)
+acquire_lock() {
+    local max_attempts=50
+    local attempt=0
+    while ! mkdir "${LOCK_DIR}" 2>/dev/null; do
+        attempt=$((attempt + 1))
+        if [ ${attempt} -ge ${max_attempts} ]; then
+            echo "Error: Could not acquire lock on registry" >&2
+            exit 1
+        fi
+        sleep 0.1
+    done
+}
+
+release_lock() {
+    rmdir "${LOCK_DIR}" 2>/dev/null || true
+}
+
+# Ensure lock is released on exit
+trap release_lock EXIT
+
+acquire_lock
+
+# Read current registry, add new agent, write back
+if [ -f "${REGISTRY_FILE}" ]; then
+    # Use a temporary file for atomic update
+    TMP_REGISTRY=$(mktemp)
+
+    # Add agent to registry using sed/awk (avoiding jq dependency)
+    # This is a simple approach that works for our JSON structure
+    if command -v python3 &> /dev/null; then
+        python3 << PYTHON
+import json
+with open('${REGISTRY_FILE}', 'r') as f:
+    registry = json.load(f)
+registry['agents']['${AGENT_ID}'] = {
+    'name': '${AGENT_NAME}',
+    'state': '${AGENT_STATE}',
+    'start_time': '${TIMESTAMP}'
+}
+with open('${TMP_REGISTRY}', 'w') as f:
+    json.dump(registry, f, indent=2)
+PYTHON
+    else
+        # Fallback without python - simple append (less elegant but works)
+        # This creates a valid JSON by reconstructing it
+        echo '{"agents":{' > "${TMP_REGISTRY}"
+
+        # If registry has existing agents, copy them
+        existing=$(grep -o '"[^"]*":{[^}]*}' "${REGISTRY_FILE}" 2>/dev/null || echo "")
+        if [ -n "${existing}" ]; then
+            echo "${existing}," >> "${TMP_REGISTRY}"
+        fi
+
+        # Add new agent
+        echo "\"${AGENT_ID}\":{\"name\":\"${AGENT_NAME}\",\"state\":\"${AGENT_STATE}\",\"start_time\":\"${TIMESTAMP}\"}" >> "${TMP_REGISTRY}"
+        echo '}}' >> "${TMP_REGISTRY}"
+    fi
+
+    mv "${TMP_REGISTRY}" "${REGISTRY_FILE}"
+fi
+
+# Output agent ID
+echo "${AGENT_ID}"

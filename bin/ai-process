@@ -1,0 +1,95 @@
+#!/bin/bash
+# ai-process - Move a message from todo to wip (work in progress)
+# Usage: ai-process AGENT_ID MESSAGE_FILE
+
+set -e
+
+AI_CENTER_DIR="${HOME}/.ai-center"
+
+show_help() {
+    cat << EOF
+Usage: ai-process AGENT_ID MESSAGE_FILE
+
+Move a message from todo/ to wip/ to indicate it's being processed.
+
+Arguments:
+  AGENT_ID       The ID of the agent
+  MESSAGE_FILE   The filename of the message to process
+
+Options:
+  -h, --help     Show this help message
+
+Examples:
+  ai-process abc123 2026-01-19T10-00-00Z_abc12345.md
+  ai-process abc123 \$(ai-check abc123 -q | head -1)  # Process first message
+EOF
+}
+
+# Parse arguments
+AGENT_ID=""
+MESSAGE_FILE=""
+
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        -h|--help)
+            show_help
+            exit 0
+            ;;
+        -*)
+            echo "Unknown option: $1" >&2
+            show_help >&2
+            exit 1
+            ;;
+        *)
+            if [ -z "${AGENT_ID}" ]; then
+                AGENT_ID="$1"
+            elif [ -z "${MESSAGE_FILE}" ]; then
+                MESSAGE_FILE="$1"
+            fi
+            shift
+            ;;
+    esac
+done
+
+if [ -z "${AGENT_ID}" ] || [ -z "${MESSAGE_FILE}" ]; then
+    echo "Error: AGENT_ID and MESSAGE_FILE are required" >&2
+    show_help >&2
+    exit 1
+fi
+
+AGENT_DIR="${AI_CENTER_DIR}/agents/${AGENT_ID}"
+TODO_DIR="${AGENT_DIR}/incoming/todo"
+WIP_DIR="${AGENT_DIR}/incoming/wip"
+
+# Validate agent exists
+if [ ! -d "${AGENT_DIR}" ]; then
+    echo "Error: Agent ${AGENT_ID} not found" >&2
+    exit 1
+fi
+
+# Ensure directories exist
+mkdir -p "${WIP_DIR}"
+
+# Check if message exists in todo
+SOURCE_FILE="${TODO_DIR}/${MESSAGE_FILE}"
+if [ ! -f "${SOURCE_FILE}" ]; then
+    echo "Error: Message not found in todo: ${MESSAGE_FILE}" >&2
+    exit 1
+fi
+
+# Check if already in wip
+if [ -f "${WIP_DIR}/${MESSAGE_FILE}" ]; then
+    echo "Error: Message already in wip: ${MESSAGE_FILE}" >&2
+    exit 1
+fi
+
+# Move to wip
+mv "${SOURCE_FILE}" "${WIP_DIR}/${MESSAGE_FILE}"
+
+echo "Processing: ${MESSAGE_FILE}"
+echo "Moved from todo → wip"
+
+# Output the message content for convenience
+echo ""
+echo "--- Message Content ---"
+cat "${WIP_DIR}/${MESSAGE_FILE}"

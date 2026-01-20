@@ -1,0 +1,27 @@
+{
+  "description": "AI Center lifecycle hooks for session awareness",
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'if command -v ai-list &>/dev/null; then count=$(ai-list -a 2>/dev/null | grep -c \"^[a-f0-9]\" || echo 0); echo \"AI Center: $count agent(s) currently registered. Use /ai-list to see them.\"; fi'"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'if [ -n \"$AI_CENTER_AGENT_ID\" ] && command -v ai-check &>/dev/null; then pending=$(ai-check $AI_CENTER_AGENT_ID -q 2>/dev/null || echo 0); if [ \"$pending\" != \"0\" ]; then echo \"AI Center: You have $pending pending message(s). Run ai-check $AI_CENTER_AGENT_ID to view.\"; fi; fi'"
+          }
+        ]
+      }
+    ]
+  }
+}

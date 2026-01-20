@@ -1,0 +1,12 @@
+{
+  "name": "@ai-center/mcp-tools",
+  "version": "1.0.0",
+  "description": "Shared MCP tools library for AI Center integrations",
+  "type": "module",
+  "main": "mcp-tools.js",
+  "exports": {
+    ".": "./mcp-tools.js"
+  },
+  "keywords": ["ai-center", "mcp", "tools"],
+  "license": "MIT"
+}

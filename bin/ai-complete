@@ -1,0 +1,140 @@
+#!/bin/bash
+# ai-complete - Move a message from wip to done (completed)
+# Usage: ai-complete AGENT_ID MESSAGE_FILE [--response "response text"]
+
+set -e
+
+AI_CENTER_DIR="${HOME}/.ai-center"
+
+# Get ISO 8601 timestamp
+get_timestamp() {
+    date -u +"%Y-%m-%dT%H:%M:%SZ"
+}
+
+show_help() {
+    cat << EOF
+Usage: ai-complete AGENT_ID MESSAGE_FILE [OPTIONS]
+
+Move a message from wip/ to done/ to indicate it's completed.
+
+Arguments:
+  AGENT_ID       The ID of the agent
+  MESSAGE_FILE   The filename of the message to complete
+
+Options:
+  -r, --response TEXT    Add a response to the message
+  --response-file FILE   Read response from file
+  -h, --help             Show this help message
+
+Examples:
+  ai-complete abc123 2026-01-19T10-00-00Z_abc12345.md
+  ai-complete abc123 msg.md --response "Done, changes pushed to main"
+  ai-complete abc123 msg.md --response-file response.md
+EOF
+}
+
+# Parse arguments
+AGENT_ID=""
+MESSAGE_FILE=""
+RESPONSE=""
+RESPONSE_FILE=""
+
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        -r|--response)
+            RESPONSE="$2"
+            shift 2
+            ;;
+        --response-file)
+            RESPONSE_FILE="$2"
+            shift 2
+            ;;
+        -h|--help)
+            show_help
+            exit 0
+            ;;
+        -*)
+            echo "Unknown option: $1" >&2
+            show_help >&2
+            exit 1
+            ;;
+        *)
+            if [ -z "${AGENT_ID}" ]; then
+                AGENT_ID="$1"
+            elif [ -z "${MESSAGE_FILE}" ]; then
+                MESSAGE_FILE="$1"
+            fi
+            shift
+            ;;
+    esac
+done
+
+if [ -z "${AGENT_ID}" ] || [ -z "${MESSAGE_FILE}" ]; then
+    echo "Error: AGENT_ID and MESSAGE_FILE are required" >&2
+    show_help >&2
+    exit 1
+fi
+
+AGENT_DIR="${AI_CENTER_DIR}/agents/${AGENT_ID}"
+WIP_DIR="${AGENT_DIR}/incoming/wip"
+DONE_DIR="${AGENT_DIR}/incoming/done"
+
+# Validate agent exists
+if [ ! -d "${AGENT_DIR}" ]; then
+    echo "Error: Agent ${AGENT_ID} not found" >&2
+    exit 1
+fi
+
+# Ensure directories exist
+mkdir -p "${DONE_DIR}"
+
+# Check if message exists in wip
+SOURCE_FILE="${WIP_DIR}/${MESSAGE_FILE}"
+if [ ! -f "${SOURCE_FILE}" ]; then
+    # Also check if it's in todo (might have been skipped)
+    TODO_FILE="${AGENT_DIR}/incoming/todo/${MESSAGE_FILE}"
+    if [ -f "${TODO_FILE}" ]; then
+        SOURCE_FILE="${TODO_FILE}"
+        echo "Note: Message was in todo, not wip"
+    else
+        echo "Error: Message not found in wip: ${MESSAGE_FILE}" >&2
+        exit 1
+    fi
+fi
+
+# Read response from file if specified
+if [ -n "${RESPONSE_FILE}" ]; then
+    if [ ! -f "${RESPONSE_FILE}" ]; then
+        echo "Error: Response file not found: ${RESPONSE_FILE}" >&2
+        exit 1
+    fi
+    RESPONSE=$(cat "${RESPONSE_FILE}")
+fi
+
+# Add response and completion timestamp to message
+TIMESTAMP=$(get_timestamp)
+DEST_FILE="${DONE_DIR}/${MESSAGE_FILE}"
+
+# Copy original and append completion info
+cp "${SOURCE_FILE}" "${DEST_FILE}"
+
+cat >> "${DEST_FILE}" << EOF
+
+---
+## Completion
+- Completed: ${TIMESTAMP}
+EOF
+
+if [ -n "${RESPONSE}" ]; then
+    cat >> "${DEST_FILE}" << EOF
+
+### Response
+${RESPONSE}
+EOF
+fi
+
+# Remove original
+rm "${SOURCE_FILE}"
+
+echo "Completed: ${MESSAGE_FILE}"
+echo "Moved from wip → done"

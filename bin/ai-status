@@ -1,0 +1,199 @@
+#!/bin/bash
+# ai-status - Update agent status fields
+# Usage: ai-status AGENT_ID [OPTIONS]
+
+set -e
+
+AI_CENTER_DIR="${HOME}/.ai-center"
+
+# Get ISO 8601 timestamp
+get_timestamp() {
+    date -u +"%Y-%m-%dT%H:%M:%SZ"
+}
+
+show_help() {
+    cat << EOF
+Usage: ai-status AGENT_ID [OPTIONS]
+
+Update status fields for an agent.
+
+Arguments:
+  AGENT_ID    The ID of the agent to update
+
+Options:
+  -s, --state STATE         Update state: active|idle|waiting|completed
+  -t, --task TASK           Update current_task description
+  -p, --progress PERCENT    Update progress_percent (0-100)
+  --files FILES             Update files_in_progress (comma-separated)
+  --git-branch BRANCH       Update git_branch
+  -h, --help                Show this help message
+
+Example:
+  ai-status abc123 --state active --task "Analyzing code" --progress 25
+  ai-status abc123 --files "auth.py,login.py" --progress 50
+EOF
+}
+
+# Parse arguments
+AGENT_ID=""
+STATE=""
+TASK=""
+PROGRESS=""
+FILES=""
+GIT_BRANCH=""
+
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        -s|--state)
+            STATE="$2"
+            shift 2
+            ;;
+        -t|--task)
+            TASK="$2"
+            shift 2
+            ;;
+        -p|--progress)
+            PROGRESS="$2"
+            shift 2
+            ;;
+        --files)
+            FILES="$2"
+            shift 2
+            ;;
+        --git-branch)
+            GIT_BRANCH="$2"
+            shift 2
+            ;;
+        -h|--help)
+            show_help
+            exit 0
+            ;;
+        -*)
+            echo "Unknown option: $1" >&2
+            show_help >&2
+            exit 1
+            ;;
+        *)
+            AGENT_ID="$1"
+            shift
+            ;;
+    esac
+done
+
+if [ -z "${AGENT_ID}" ]; then
+    echo "Error: AGENT_ID is required" >&2
+    show_help >&2
+    exit 1
+fi
+
+AGENT_DIR="${AI_CENTER_DIR}/agents/${AGENT_ID}"
+METADATA_FILE="${AGENT_DIR}/metadata.json"
+
+# Validate agent exists
+if [ ! -f "${METADATA_FILE}" ]; then
+    echo "Error: Agent ${AGENT_ID} not found" >&2
+    exit 1
+fi
+
+# Also update heartbeat when updating status
+TIMESTAMP=$(get_timestamp)
+
+# Update metadata using python (most reliable for JSON)
+if command -v python3 &> /dev/null; then
+    python3 << PYTHON
+import json
+
+with open('${METADATA_FILE}', 'r') as f:
+    metadata = json.load(f)
+
+# Always update heartbeat
+metadata['last_heartbeat'] = '${TIMESTAMP}'
+
+# Update provided fields
+state = '${STATE}'
+task = '${TASK}'
+progress = '${PROGRESS}'
+files = '${FILES}'
+git_branch = '${GIT_BRANCH}'
+
+if state:
+    metadata['state'] = state
+if task:
+    metadata['current_task'] = task
+if progress:
+    metadata['progress_percent'] = int(progress)
+if files:
+    metadata['files_in_progress'] = [f.strip() for f in files.split(',') if f.strip()]
+if git_branch:
+    metadata['git_branch'] = git_branch
+
+with open('${METADATA_FILE}', 'w') as f:
+    json.dump(metadata, f, indent=2)
+
+# Print what was updated
+updates = []
+if state:
+    updates.append(f'state={state}')
+if task:
+    updates.append(f'task="{task}"')
+if progress:
+    updates.append(f'progress={progress}%')
+if files:
+    updates.append(f'files={files}')
+if git_branch:
+    updates.append(f'git_branch={git_branch}')
+
+if updates:
+    print('Updated: ' + ', '.join(updates))
+else:
+    print('Heartbeat updated')
+PYTHON
+else
+    # Fallback using sed (less reliable for complex updates)
+    TMP_FILE=$(mktemp)
+    cp "${METADATA_FILE}" "${TMP_FILE}"
+
+    # Update heartbeat
+    sed -i.bak "s/\"last_heartbeat\": \"[^\"]*\"/\"last_heartbeat\": \"${TIMESTAMP}\"/" "${TMP_FILE}"
+
+    if [ -n "${STATE}" ]; then
+        sed -i.bak "s/\"state\": \"[^\"]*\"/\"state\": \"${STATE}\"/" "${TMP_FILE}"
+    fi
+
+    if [ -n "${TASK}" ]; then
+        # Escape special characters in task
+        ESCAPED_TASK=$(echo "${TASK}" | sed 's/[&/\]/\\&/g')
+        sed -i.bak "s/\"current_task\": \"[^\"]*\"/\"current_task\": \"${ESCAPED_TASK}\"/" "${TMP_FILE}"
+    fi
+
+    if [ -n "${PROGRESS}" ]; then
+        sed -i.bak "s/\"progress_percent\": [0-9]*/\"progress_percent\": ${PROGRESS}/" "${TMP_FILE}"
+    fi
+
+    rm -f "${TMP_FILE}.bak"
+    mv "${TMP_FILE}" "${METADATA_FILE}"
+
+    echo "Status updated"
+fi
+
+# Also update registry state if state changed
+if [ -n "${STATE}" ]; then
+    REGISTRY_FILE="${AI_CENTER_DIR}/registry.json"
+    LOCK_DIR="${AI_CENTER_DIR}/.registry.lock"
+
+    # Try to acquire lock (non-blocking for status updates)
+    if mkdir "${LOCK_DIR}" 2>/dev/null; then
+        if [ -f "${REGISTRY_FILE}" ] && command -v python3 &> /dev/null; then
+            python3 << PYTHON
+import json
+with open('${REGISTRY_FILE}', 'r') as f:
+    registry = json.load(f)
+if '${AGENT_ID}' in registry.get('agents', {}):
+    registry['agents']['${AGENT_ID}']['state'] = '${STATE}'
+with open('${REGISTRY_FILE}', 'w') as f:
+    json.dump(registry, f, indent=2)
+PYTHON
+        fi
+        rmdir "${LOCK_DIR}" 2>/dev/null || true
+    fi
+fi

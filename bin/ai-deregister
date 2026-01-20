@@ -1,0 +1,144 @@
+#!/bin/bash
+# ai-deregister - Remove an agent from the AI Center
+# Usage: ai-deregister AGENT_ID [--keep-messages]
+
+set -e
+
+AI_CENTER_DIR="${HOME}/.ai-center"
+REGISTRY_FILE="${AI_CENTER_DIR}/registry.json"
+
+KEEP_MESSAGES=false
+
+show_help() {
+    cat << EOF
+Usage: ai-deregister AGENT_ID [OPTIONS]
+
+Remove an agent from the AI Center.
+
+Arguments:
+  AGENT_ID    The ID of the agent to deregister
+
+Options:
+  --keep-messages    Keep the agent's message history (don't delete incoming/)
+  -h, --help         Show this help message
+
+Example:
+  ai-deregister abc123-def456
+  ai-deregister abc123-def456 --keep-messages
+EOF
+}
+
+# Parse arguments
+AGENT_ID=""
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --keep-messages)
+            KEEP_MESSAGES=true
+            shift
+            ;;
+        -h|--help)
+            show_help
+            exit 0
+            ;;
+        -*)
+            echo "Unknown option: $1" >&2
+            show_help >&2
+            exit 1
+            ;;
+        *)
+            AGENT_ID="$1"
+            shift
+            ;;
+    esac
+done
+
+if [ -z "${AGENT_ID}" ]; then
+    echo "Error: AGENT_ID is required" >&2
+    show_help >&2
+    exit 1
+fi
+
+AGENT_DIR="${AI_CENTER_DIR}/agents/${AGENT_ID}"
+
+# Validate agent exists
+if [ ! -d "${AGENT_DIR}" ]; then
+    echo "Error: Agent ${AGENT_ID} not found" >&2
+    exit 1
+fi
+
+# Remove from registry (using directory-based locking for macOS compatibility)
+LOCK_DIR="${AI_CENTER_DIR}/.registry.lock"
+
+acquire_lock() {
+    local max_attempts=50
+    local attempt=0
+    while ! mkdir "${LOCK_DIR}" 2>/dev/null; do
+        attempt=$((attempt + 1))
+        if [ ${attempt} -ge ${max_attempts} ]; then
+            echo "Error: Could not acquire lock on registry" >&2
+            exit 1
+        fi
+        sleep 0.1
+    done
+}
+
+release_lock() {
+    rmdir "${LOCK_DIR}" 2>/dev/null || true
+}
+
+trap release_lock EXIT
+acquire_lock
+
+if [ -f "${REGISTRY_FILE}" ]; then
+    if command -v python3 &> /dev/null; then
+        python3 << PYTHON
+import json
+with open('${REGISTRY_FILE}', 'r') as f:
+    registry = json.load(f)
+if '${AGENT_ID}' in registry.get('agents', {}):
+    del registry['agents']['${AGENT_ID}']
+with open('${REGISTRY_FILE}', 'w') as f:
+    json.dump(registry, f, indent=2)
+PYTHON
+    else
+        # Fallback: rebuild registry without this agent
+        TMP_FILE=$(mktemp)
+        echo '{"agents":{' > "${TMP_FILE}"
+
+        # Extract all agents except this one
+        first=true
+        for agent_dir in "${AI_CENTER_DIR}"/agents/*/; do
+            if [ -d "${agent_dir}" ]; then
+                other_id=$(basename "${agent_dir}")
+                if [ "${other_id}" != "${AGENT_ID}" ] && [ -f "${agent_dir}/metadata.json" ]; then
+                    if [ "${first}" = false ]; then
+                        echo "," >> "${TMP_FILE}"
+                    fi
+                    first=false
+
+                    # Extract name and state from metadata
+                    name=$(grep -o '"name": "[^"]*"' "${agent_dir}/metadata.json" | head -1 | cut -d'"' -f4)
+                    state=$(grep -o '"state": "[^"]*"' "${agent_dir}/metadata.json" | head -1 | cut -d'"' -f4)
+                    start_time=$(grep -o '"start_time": "[^"]*"' "${agent_dir}/metadata.json" | head -1 | cut -d'"' -f4)
+
+                    echo -n "\"${other_id}\":{\"name\":\"${name}\",\"state\":\"${state}\",\"start_time\":\"${start_time}\"}" >> "${TMP_FILE}"
+                fi
+            fi
+        done
+
+        echo '}}' >> "${TMP_FILE}"
+        mv "${TMP_FILE}" "${REGISTRY_FILE}"
+    fi
+fi
+
+# Remove agent directory
+if [ "${KEEP_MESSAGES}" = true ]; then
+    # Keep messages but remove metadata
+    rm -f "${AGENT_DIR}/metadata.json"
+    rm -f "${AGENT_DIR}/plan.md"
+    echo "Agent ${AGENT_ID} deregistered (messages kept)"
+else
+    # Remove everything
+    rm -rf "${AGENT_DIR}"
+    echo "Agent ${AGENT_ID} deregistered"
+fi

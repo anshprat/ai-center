@@ -1,0 +1,10 @@
+{
+  "servers": {
+    "ai-center": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["${userHome}/.ai-center/integrations/vscode/mcp-server/index.js"],
+      "env": {}
+    }
+  }
+}

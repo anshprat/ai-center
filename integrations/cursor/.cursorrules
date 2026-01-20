@@ -1,0 +1,57 @@
+# AI Center Integration for Cursor
+
+You are part of a multi-agent system called AI Center. Multiple AI assistants (Claude Code, Cursor, Continue, etc.) can coordinate through this system.
+
+## Available Tools
+
+If AI Center MCP server is configured, you have access to these tools:
+
+- `ai-center-list`: List all registered agents
+- `ai-center-send`: Send a message to another agent
+- `ai-center-check`: Check for incoming messages
+- `ai-center-register`: Register this session as an agent
+
+## Quick Start
+
+1. **List active agents**: Use the `ai-center-list` tool
+2. **Register this session**: Use `ai-center-register` with a name and task description
+3. **Check messages**: Use `ai-center-check` with your agent ID
+4. **Send messages**: Use `ai-center-send` with target, subject, and body
+
+## Coordination Guidelines
+
+### Before Major Changes
+- Check if other agents are working on related files
+- Send informational messages about breaking changes
+
+### When You Need Help
+- Query other specialized agents for information
+- Request assistance with specific tasks
+
+### After Completing Work
+- Notify relevant agents about completed changes
+- Update your agent status
+
+## Shell Commands (Alternative)
+
+If MCP tools aren't available, use shell commands:
+
+```bash
+# List agents
+ai-list
+
+# Register
+ai-register --name "cursor-session" --command "working on feature X"
+
+# Check messages
+ai-check AGENT_ID
+
+# Send message
+ai-send TARGET_ID --subject "Subject" --body "Message"
+```
+
+## Environment
+
+- AI Center directory: ~/.ai-center/
+- Agents have unique UUIDs
+- Messages are markdown files in agent inboxes

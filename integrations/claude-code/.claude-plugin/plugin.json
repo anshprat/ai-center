@@ -1,0 +1,10 @@
+{
+  "name": "ai-center",
+  "version": "1.0.0",
+  "description": "AI Center integration for multi-agent awareness and communication",
+  "author": "AI Center",
+  "homepage": "https://github.com/anshprat/claude-center",
+  "commands": "../commands",
+  "skills": "../skills",
+  "hooks": "../hooks/hooks.json"
+}
