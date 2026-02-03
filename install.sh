@@ -235,11 +235,9 @@ if [ "${CLAUDE_CODE_DETECTED}" = true ] && [ -d "${INTEGRATIONS_DIR}/claude-code
     # Configure SessionStart and Stop hooks in ~/.claude/settings.json
     CLAUDE_SETTINGS="${HOME}/.claude/settings.json"
     if [ -f "${CLAUDE_SETTINGS}" ]; then
-        # Check if hooks are already configured
-        if ! grep -q "SessionStart" "${CLAUDE_SETTINGS}" 2>/dev/null; then
-            # Use python to merge hooks into existing settings
-            if command -v python3 &> /dev/null; then
-                python3 << 'PYTHON'
+        # Use python to intelligently merge hooks into existing settings
+        if command -v python3 &> /dev/null; then
+            HOOK_RESULT=$(python3 << 'PYTHON'
 import json
 import os
 
@@ -249,40 +247,55 @@ scripts_dir = os.path.expanduser("~/.ai-center/scripts")
 with open(settings_path, 'r') as f:
     settings = json.load(f)
 
-settings['hooks'] = {
-    "SessionStart": [
-        {
-            "hooks": [
-                {
-                    "type": "command",
-                    "command": f"bash {scripts_dir}/session-start.sh"
-                }
-            ]
-        }
-    ],
-    "Stop": [
-        {
-            "hooks": [
-                {
-                    "type": "command",
-                    "command": "bash -c 'if [ -n \"$AI_CENTER_AGENT_ID\" ]; then ~/.ai-center/bin/ai-deregister \"$AI_CENTER_AGENT_ID\" 2>/dev/null; fi'"
-                }
-            ]
-        }
-    ]
-}
+if 'hooks' not in settings:
+    settings['hooks'] = {}
 
-with open(settings_path, 'w') as f:
-    json.dump(settings, f, indent=2)
+hooks = settings['hooks']
+added = []
+
+if 'SessionStart' not in hooks:
+    hooks['SessionStart'] = [{"hooks": [{"type": "command", "command": f"bash {scripts_dir}/session-start.sh"}]}]
+    added.append("SessionStart")
+
+if 'Stop' not in hooks:
+    hooks['Stop'] = [{"hooks": [{"type": "command", "command": "bash -c 'if [ -n \"$AI_CENTER_AGENT_ID\" ]; then ~/.ai-center/bin/ai-deregister \"$AI_CENTER_AGENT_ID\" 2>/dev/null; fi'"}]}]
+    added.append("Stop")
+
+if 'UserPromptSubmit' not in hooks:
+    hooks['UserPromptSubmit'] = [{"hooks": [{"type": "command", "command": "bash -c 'if [ -n \"$AI_CENTER_AGENT_ID\" ]; then ~/.ai-center/bin/ai-heartbeat \"$AI_CENTER_AGENT_ID\" 2>/dev/null; fi'"}]}]
+    added.append("UserPromptSubmit")
+
+if 'PostToolUse' not in hooks:
+    hooks['PostToolUse'] = [{"hooks": [{"type": "command", "command": "bash -c 'if [ -n \"$AI_CENTER_AGENT_ID\" ]; then ~/.ai-center/bin/ai-heartbeat \"$AI_CENTER_AGENT_ID\" 2>/dev/null; fi'"}]}]
+    added.append("PostToolUse")
+
+if added:
+    with open(settings_path, 'w') as f:
+        json.dump(settings, f, indent=2)
+    print(",".join(added))
+else:
+    print("NONE")
 PYTHON
-                print_success "Configured SessionStart hook (auto-register on session start)"
-                print_success "Configured Stop hook (auto-deregister on session end)"
+)
+            if [ "${HOOK_RESULT}" = "NONE" ]; then
+                print_info "All AI Center hooks already configured"
             else
-                print_warning "Python3 not found - hooks not configured automatically"
-                print_info "Add hooks manually to ${CLAUDE_SETTINGS}"
+                if echo "${HOOK_RESULT}" | grep -q "SessionStart"; then
+                    print_success "Configured SessionStart hook (auto-register on session start)"
+                fi
+                if echo "${HOOK_RESULT}" | grep -q "Stop"; then
+                    print_success "Configured Stop hook (auto-deregister on session end)"
+                fi
+                if echo "${HOOK_RESULT}" | grep -q "UserPromptSubmit"; then
+                    print_success "Configured UserPromptSubmit hook (heartbeat on each prompt)"
+                fi
+                if echo "${HOOK_RESULT}" | grep -q "PostToolUse"; then
+                    print_success "Configured PostToolUse hook (heartbeat on each tool call)"
+                fi
             fi
         else
-            print_info "SessionStart hooks already configured"
+            print_warning "Python3 not found - hooks not configured automatically"
+            print_info "Add hooks manually to ${CLAUDE_SETTINGS}"
         fi
     else
         print_warning "Claude settings.json not found at ${CLAUDE_SETTINGS}"
@@ -331,6 +344,21 @@ ai-check AGENT_ID    # Check messages
 - **For coordination**: Send messages to notify other agents about breaking changes
 - **For questions**: Query other agents for information about their work areas
 - **After completing work**: Notify relevant agents about completed changes
+
+### Heartbeat System
+
+AI Center uses heartbeats to track agent liveness. Your Claude Code session automatically sends heartbeats:
+
+- **On session start**: Heartbeat is set when you register
+- **On each prompt**: Heartbeat is updated whenever you send a message
+- **On each tool call**: Heartbeat is updated after every tool use (keeps agent alive during long tasks)
+- **Stale detection**: Agents without heartbeats for >1 hour are marked stale
+
+```bash
+ai-heartbeat AGENT_ID    # Manually update heartbeat
+ai-cleanup               # Remove stale agents (>1 hour without heartbeat)
+ai-cleanup -t 1800       # Remove agents stale for >30 minutes
+```
 
 AICENTERSECTION
         print_success "Added AI Center section to CLAUDE.md"

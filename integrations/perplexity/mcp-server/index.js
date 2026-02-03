@@ -16,6 +16,9 @@ import {
   handleToolCall,
   autoRegister,
   autoDeregister,
+  updateHeartbeat,
+  startHeartbeatInterval,
+  stopHeartbeatInterval,
 } from "../../shared/mcp-tools.js";
 
 const MODEL_NAME = "perplexity";
@@ -52,6 +55,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   // Track agent ID if registration was successful
   if (name === "ai-center-register" && result.agentId) {
     registeredAgentId = result.agentId;
+    startHeartbeatInterval(registeredAgentId);
+  }
+
+  // Update heartbeat on every tool call (shows agent activity)
+  if (registeredAgentId) {
+    updateHeartbeat(registeredAgentId);
   }
 
   return result;
@@ -61,18 +70,28 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 async function main() {
   // Register cleanup handlers
   process.on("SIGINT", () => {
+    stopHeartbeatInterval();
     autoDeregister(registeredAgentId);
     process.exit(0);
   });
   process.on("SIGTERM", () => {
+    stopHeartbeatInterval();
     autoDeregister(registeredAgentId);
     process.exit(0);
   });
-  process.on("exit", () => autoDeregister(registeredAgentId));
+  process.on("exit", () => {
+    stopHeartbeatInterval();
+    autoDeregister(registeredAgentId);
+  });
 
   // Auto-register this Perplexity instance
   const { agentId, agentName } = autoRegister(MODEL_NAME, CLIENT_NAME);
   registeredAgentId = agentId;
+
+  // Start periodic heartbeat to indicate this agent is alive
+  if (registeredAgentId) {
+    startHeartbeatInterval(registeredAgentId);
+  }
 
   const transport = new StdioServerTransport();
   await server.connect(transport);

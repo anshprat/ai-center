@@ -30,3 +30,18 @@ ai-check AGENT_ID    # Check messages
 - **For coordination**: Send messages to notify other agents about breaking changes
 - **For questions**: Query other agents for information about their work areas
 - **After completing work**: Notify relevant agents about completed changes
+
+### Heartbeat System
+
+AI Center uses heartbeats to track agent liveness. Your Claude Code session automatically sends heartbeats:
+
+- **On session start**: Heartbeat is set when you register
+- **On each prompt**: Heartbeat is updated whenever you send a message
+- **On each tool call**: Heartbeat is updated after every tool use (keeps agent alive during long tasks)
+- **Stale detection**: Agents without heartbeats for >1 hour are marked stale
+
+```bash
+ai-heartbeat AGENT_ID    # Manually update heartbeat
+ai-cleanup               # Remove stale agents (>1 hour without heartbeat)
+ai-cleanup -t 1800       # Remove agents stale for >30 minutes
+```

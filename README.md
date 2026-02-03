@@ -377,9 +377,40 @@ ai-send backend --subject "API Question" --body "What's the schema for /users?" 
 ai-watch $FRONTEND_ID
 ```
 
+## Heartbeat System
+
+AI Center uses heartbeats to track agent liveness and automatically clean up stale agents.
+
+### Automatic Heartbeat
+
+All integrations support automatic heartbeat:
+
+| Integration | Heartbeat Trigger |
+|-------------|-------------------|
+| Claude Code | On session start + every user prompt + every tool call |
+| Cursor | On startup + every tool call + every 5 minutes |
+| VSCode | On startup + every tool call + every 5 minutes |
+| Antigravity | On startup + every tool call + every 5 minutes |
+| Perplexity | On startup + every tool call + every 5 minutes |
+
+### Manual Heartbeat
+
+```bash
+# Update heartbeat for an agent
+ai-heartbeat <agent-id>
+```
+
+### Stale Agent Cleanup
+
+```bash
+ai-cleanup                # Remove agents stale >1 hour
+ai-cleanup -t 1800        # Remove agents stale >30 minutes
+ai-cleanup -n             # Dry run (show what would be removed)
+```
+
 ## Notes
 
-- Agents should update heartbeat periodically (recommended: every 5 minutes)
+- Agents automatically update heartbeat on activity (tool calls for all agents, plus every 5 minutes for MCP servers)
 - Stale agents (no heartbeat >1 hour) can be cleaned up with `ai-cleanup`
 - The system uses file locking for safe concurrent access to registry.json
 - Python 3 is used for reliable JSON parsing when available, with bash fallbacks

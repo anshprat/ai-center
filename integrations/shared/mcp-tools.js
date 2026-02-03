@@ -12,6 +12,10 @@ import { randomUUID } from "crypto";
 export const AI_CENTER_DIR = join(homedir(), ".ai-center");
 export const ARTIFACTS_DIR = join(AI_CENTER_DIR, "artifacts");
 
+// Heartbeat interval reference (for cleanup)
+let heartbeatIntervalId = null;
+const DEFAULT_HEARTBEAT_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
+
 /**
  * Helper to run ai-* commands
  */
@@ -586,10 +590,62 @@ export function autoRegister(modelName, clientName) {
 export function autoDeregister(agentId) {
   if (agentId) {
     try {
+      stopHeartbeatInterval(); // Stop heartbeat before deregistering
       runCommand("ai-deregister", [agentId]);
       console.error(`AI Center: Deregistered ${agentId}`);
     } catch (error) {
       // Ignore errors on cleanup
     }
+  }
+}
+
+/**
+ * Update heartbeat for an agent
+ * @param {string} agentId - Agent ID to update heartbeat for
+ * @returns {boolean} - True if heartbeat was updated successfully
+ */
+export function updateHeartbeat(agentId) {
+  if (!agentId) return false;
+
+  try {
+    const result = runCommand("ai-heartbeat", [agentId]);
+    return result.success;
+  } catch (error) {
+    console.error("AI Center: Heartbeat update failed:", error.message);
+    return false;
+  }
+}
+
+/**
+ * Start periodic heartbeat updates for an agent
+ * @param {string} agentId - Agent ID to send heartbeats for
+ * @param {number} intervalMs - Interval in milliseconds (default: 5 minutes)
+ * @returns {boolean} - True if heartbeat interval was started
+ */
+export function startHeartbeatInterval(agentId, intervalMs = DEFAULT_HEARTBEAT_INTERVAL_MS) {
+  if (!agentId) return false;
+
+  // Stop any existing heartbeat interval
+  stopHeartbeatInterval();
+
+  // Send initial heartbeat
+  updateHeartbeat(agentId);
+
+  // Start periodic heartbeat
+  heartbeatIntervalId = setInterval(() => {
+    updateHeartbeat(agentId);
+  }, intervalMs);
+
+  console.error(`AI Center: Started heartbeat (every ${intervalMs / 1000}s)`);
+  return true;
+}
+
+/**
+ * Stop periodic heartbeat updates
+ */
+export function stopHeartbeatInterval() {
+  if (heartbeatIntervalId) {
+    clearInterval(heartbeatIntervalId);
+    heartbeatIntervalId = null;
   }
 }
