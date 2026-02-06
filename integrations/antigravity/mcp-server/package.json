@@ -1,7 +1,7 @@
 {
-  "name": "ai-center-mcp-antigravity",
+  "name": "team-ai-mcp-antigravity",
   "version": "1.0.0",
-  "description": "AI Center MCP server for Google Antigravity IDE",
+  "description": "Team AI MCP server for Google Antigravity IDE",
   "type": "module",
   "main": "index.js",
   "scripts": {
@@ -10,6 +10,6 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^0.5.0"
   },
-  "keywords": ["ai-center", "mcp", "antigravity", "google"],
+  "keywords": ["team-ai", "mcp", "antigravity", "google"],
   "license": "MIT"
 }

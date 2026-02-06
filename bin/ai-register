@@ -1,11 +1,11 @@
 #!/bin/bash
-# ai-register - Register a new agent in the AI Center
+# ai-register - Register a new agent in the Team AI
 # Usage: ai-register --name "agent-name" --command "task description" [options]
 
 set -e
 
-AI_CENTER_DIR="${HOME}/.ai-center"
-REGISTRY_FILE="${AI_CENTER_DIR}/registry.json"
+TEAM_AI_DIR="${HOME}/.team-ai"
+REGISTRY_FILE="${TEAM_AI_DIR}/registry.json"
 
 # Default values
 AGENT_NAME=""
@@ -44,7 +44,7 @@ show_help() {
     cat << EOF
 Usage: ai-register [OPTIONS]
 
-Register a new agent in the AI Center.
+Register a new agent in the Team AI.
 
 Options:
   -n, --name NAME           Agent name (required)
@@ -126,15 +126,15 @@ if [ -z "${AGENT_COMMAND}" ]; then
     exit 1
 fi
 
-# Ensure AI Center directory exists
-if [ ! -d "${AI_CENTER_DIR}" ]; then
-    echo "Error: AI Center not installed. Run install.sh first." >&2
+# Ensure Team AI directory exists
+if [ ! -d "${TEAM_AI_DIR}" ]; then
+    echo "Error: Team AI not installed. Run install.sh first." >&2
     exit 1
 fi
 
 # Generate agent ID
 AGENT_ID=$(generate_uuid)
-AGENT_DIR="${AI_CENTER_DIR}/agents/${AGENT_ID}"
+AGENT_DIR="${TEAM_AI_DIR}/agents/${AGENT_ID}"
 TIMESTAMP=$(get_timestamp)
 WORKING_DIR=$(pwd)
 GIT_BRANCH=$(get_git_branch)
@@ -182,7 +182,7 @@ cat > "${AGENT_DIR}/metadata.json" << EOF
 EOF
 
 # Update registry.json (using a lock directory for safety - works on macOS and Linux)
-LOCK_DIR="${AI_CENTER_DIR}/.registry.lock"
+LOCK_DIR="${TEAM_AI_DIR}/.registry.lock"
 
 # Simple directory-based locking (mkdir is atomic)
 acquire_lock() {

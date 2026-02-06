@@ -4,7 +4,7 @@
 
 set -e
 
-AI_CENTER_DIR="${HOME}/.ai-center"
+TEAM_AI_DIR="${HOME}/.team-ai"
 
 # Generate UUID
 generate_uuid() {
@@ -157,7 +157,7 @@ if [ -n "${ARTIFACT}" ]; then
     fi
 
     # Create artifacts directory if it doesn't exist
-    ARTIFACTS_DIR="${AI_CENTER_DIR}/artifacts"
+    ARTIFACTS_DIR="${TEAM_AI_DIR}/artifacts"
     mkdir -p "${ARTIFACTS_DIR}"
 
     # Generate artifact ID and determine type
@@ -197,12 +197,12 @@ TARGET_DIR=""
 TARGET_ID=""
 
 # First, try as direct ID
-if [ -d "${AI_CENTER_DIR}/agents/${TARGET}" ]; then
-    TARGET_DIR="${AI_CENTER_DIR}/agents/${TARGET}"
+if [ -d "${TEAM_AI_DIR}/agents/${TARGET}" ]; then
+    TARGET_DIR="${TEAM_AI_DIR}/agents/${TARGET}"
     TARGET_ID="${TARGET}"
 else
     # Search by name
-    for agent_dir in "${AI_CENTER_DIR}"/agents/*/; do
+    for agent_dir in "${TEAM_AI_DIR}"/agents/*/; do
         if [ -d "${agent_dir}" ]; then
             metadata_file="${agent_dir}/metadata.json"
             if [ -f "${metadata_file}" ]; then

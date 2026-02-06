@@ -4,8 +4,8 @@
 
 set -e
 
-AI_CENTER_DIR="${HOME}/.ai-center"
-WATCHER_PID_FILE="${AI_CENTER_DIR}/watcher.pid"
+TEAM_AI_DIR="${HOME}/.team-ai"
+WATCHER_PID_FILE="${TEAM_AI_DIR}/watcher.pid"
 
 # Default poll interval: 5 seconds
 POLL_INTERVAL=5
@@ -70,7 +70,7 @@ if [ -z "${AGENT_ID}" ]; then
     exit 1
 fi
 
-AGENT_DIR="${AI_CENTER_DIR}/agents/${AGENT_ID}"
+AGENT_DIR="${TEAM_AI_DIR}/agents/${AGENT_ID}"
 TODO_DIR="${AGENT_DIR}/incoming/todo"
 
 # Validate agent exists
@@ -152,7 +152,7 @@ if [ "${DAEMON}" = true ]; then
     # Fork to background
     (
         # Redirect stdout/stderr to log file
-        exec >> "${AI_CENTER_DIR}/watcher.log" 2>&1
+        exec >> "${TEAM_AI_DIR}/watcher.log" 2>&1
 
         echo "$(date '+%Y-%m-%d %H:%M:%S') - Watcher started for agent: ${AGENT_ID}"
 
@@ -180,7 +180,7 @@ if [ "${DAEMON}" = true ]; then
     echo "${daemon_pid}" > "${WATCHER_PID_FILE}"
 
     echo "Watcher daemon started (PID: ${daemon_pid})"
-    echo "Log file: ${AI_CENTER_DIR}/watcher.log"
+    echo "Log file: ${TEAM_AI_DIR}/watcher.log"
     echo "Use 'ai-watch-stop' to stop the daemon"
     exit 0
 fi

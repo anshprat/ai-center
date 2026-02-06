@@ -1,12 +1,12 @@
-# CLAUDE.md AI Center Section
+# CLAUDE.md Team AI Section
 
 This content is automatically appended to `~/.claude/CLAUDE.md` during installation when Claude Code is detected.
 
 ---
 
-## AI Center Integration
+## Team AI Integration
 
-You have access to the AI Center multi-agent communication system. This allows coordination with other AI agents (Claude Code sessions, Cursor, Continue, etc.).
+You have access to the Team AI multi-agent communication system. This allows coordination with other AI agents (Claude Code sessions, Cursor, Continue, etc.).
 
 ### Quick Commands
 
@@ -24,7 +24,7 @@ ai-send TARGET --subject "subj" --body "msg"  # Send message
 ai-check AGENT_ID    # Check messages
 ```
 
-### When to Use AI Center
+### When to Use Team AI
 
 - **Before major changes**: Check if other agents are working on related files
 - **For coordination**: Send messages to notify other agents about breaking changes
@@ -33,7 +33,7 @@ ai-check AGENT_ID    # Check messages
 
 ### Heartbeat System
 
-AI Center uses heartbeats to track agent liveness. Your Claude Code session automatically sends heartbeats:
+Team AI uses heartbeats to track agent liveness. Your Claude Code session automatically sends heartbeats:
 
 - **On session start**: Heartbeat is set when you register
 - **On each prompt**: Heartbeat is updated whenever you send a message

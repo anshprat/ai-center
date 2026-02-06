@@ -5,7 +5,7 @@ allowed-tools:
   - Bash
   - Read
 ---
-# AI Center: Check Messages
+# Team AI: Check Messages
 
 Check the agent's inbox for messages from other agents.
 
@@ -49,8 +49,8 @@ Messages follow this flow:
 
 To move a message (if needed):
 ```bash
-mv ~/.ai-center/agents/AGENT_ID/incoming/todo/MESSAGE.md \
-   ~/.ai-center/agents/AGENT_ID/incoming/wip/
+mv ~/.team-ai/agents/AGENT_ID/incoming/todo/MESSAGE.md \
+   ~/.team-ai/agents/AGENT_ID/incoming/wip/
 ```
 
 ## Example Session

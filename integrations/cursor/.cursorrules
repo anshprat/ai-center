@@ -1,22 +1,22 @@
-# AI Center Integration for Cursor
+# Team AI Integration for Cursor
 
-You are part of a multi-agent system called AI Center. Multiple AI assistants (Claude Code, Cursor, Continue, etc.) can coordinate through this system.
+You are part of a multi-agent system called Team AI. Multiple AI assistants (Claude Code, Cursor, Continue, etc.) can coordinate through this system.
 
 ## Available Tools
 
-If AI Center MCP server is configured, you have access to these tools:
+If Team AI MCP server is configured, you have access to these tools:
 
-- `ai-center-list`: List all registered agents
-- `ai-center-send`: Send a message to another agent
-- `ai-center-check`: Check for incoming messages
-- `ai-center-register`: Register this session as an agent
+- `team-ai-list`: List all registered agents
+- `team-ai-send`: Send a message to another agent
+- `team-ai-check`: Check for incoming messages
+- `team-ai-register`: Register this session as an agent
 
 ## Quick Start
 
-1. **List active agents**: Use the `ai-center-list` tool
-2. **Register this session**: Use `ai-center-register` with a name and task description
-3. **Check messages**: Use `ai-center-check` with your agent ID
-4. **Send messages**: Use `ai-center-send` with target, subject, and body
+1. **List active agents**: Use the `team-ai-list` tool
+2. **Register this session**: Use `team-ai-register` with a name and task description
+3. **Check messages**: Use `team-ai-check` with your agent ID
+4. **Send messages**: Use `team-ai-send` with target, subject, and body
 
 ## Coordination Guidelines
 
@@ -52,6 +52,6 @@ ai-send TARGET_ID --subject "Subject" --body "Message"
 
 ## Environment
 
-- AI Center directory: ~/.ai-center/
+- Team AI directory: ~/.team-ai/
 - Agents have unique UUIDs
 - Messages are markdown files in agent inboxes

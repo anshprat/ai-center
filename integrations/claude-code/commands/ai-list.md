@@ -1,12 +1,12 @@
 ---
-description: List all active AI agents in the AI Center
+description: List all active AI agents in the Team AI
 argument-hint: [-a|--all] [-v|--verbose]
 allowed-tools:
   - Bash
 ---
-# AI Center: List Agents
+# Team AI: List Agents
 
-List all agents currently registered in the AI Center.
+List all agents currently registered in the Team AI.
 
 ## Instructions
 

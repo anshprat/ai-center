@@ -1,12 +1,12 @@
 #!/bin/bash
-# AI Center Installation Script
-# Creates the ~/.ai-center/ directory structure, installs scripts,
+# Team AI Installation Script
+# Creates the ~/.team-ai/ directory structure, installs scripts,
 # and configures integrations for detected AI tools
 
 set -e
 
-AI_CENTER_DIR="${HOME}/.ai-center"
-AI_CENTER_BIN="${AI_CENTER_DIR}/bin"
+TEAM_AI_DIR="${HOME}/.team-ai"
+TEAM_AI_BIN="${TEAM_AI_DIR}/bin"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SOURCE_BIN="${SCRIPT_DIR}/bin"
 INTEGRATIONS_DIR="${SCRIPT_DIR}/integrations"
@@ -21,7 +21,7 @@ NC='\033[0m' # No Color
 print_header() {
     echo ""
     echo -e "${BLUE}═══════════════════════════════════════════════════════════${NC}"
-    echo -e "${BLUE}  AI Center Installation${NC}"
+    echo -e "${BLUE}  Team AI Installation${NC}"
     echo -e "${BLUE}═══════════════════════════════════════════════════════════${NC}"
     echo ""
 }
@@ -48,7 +48,7 @@ print_error() {
 }
 
 print_header
-echo "Installing AI Center multi-agent communication system..."
+echo "Installing Team AI multi-agent communication system..."
 
 # =============================================================================
 # Core Installation
@@ -56,30 +56,30 @@ echo "Installing AI Center multi-agent communication system..."
 print_section "Installing core components"
 
 # Create main directory structure
-mkdir -p "${AI_CENTER_DIR}/agents"
-mkdir -p "${AI_CENTER_DIR}/artifacts"
-mkdir -p "${AI_CENTER_BIN}"
-print_success "Created directory structure at ${AI_CENTER_DIR}"
-print_success "Created artifacts directory at ${AI_CENTER_DIR}/artifacts"
+mkdir -p "${TEAM_AI_DIR}/agents"
+mkdir -p "${TEAM_AI_DIR}/artifacts"
+mkdir -p "${TEAM_AI_BIN}"
+print_success "Created directory structure at ${TEAM_AI_DIR}"
+print_success "Created artifacts directory at ${TEAM_AI_DIR}/artifacts"
 
 # Initialize registry.json if it doesn't exist
-if [ ! -f "${AI_CENTER_DIR}/registry.json" ]; then
-    echo '{"agents": {}}' > "${AI_CENTER_DIR}/registry.json"
+if [ ! -f "${TEAM_AI_DIR}/registry.json" ]; then
+    echo '{"agents": {}}' > "${TEAM_AI_DIR}/registry.json"
     print_success "Created registry.json"
 else
     print_info "registry.json already exists"
 fi
 
-# Copy scripts from source to ~/.ai-center/bin
+# Copy scripts from source to ~/.team-ai/bin
 if [ -d "${SOURCE_BIN}" ]; then
     for script in "${SOURCE_BIN}"/ai-*; do
         if [ -f "${script}" ]; then
             script_name=$(basename "${script}")
-            cp "${script}" "${AI_CENTER_BIN}/${script_name}"
-            chmod +x "${AI_CENTER_BIN}/${script_name}"
+            cp "${script}" "${TEAM_AI_BIN}/${script_name}"
+            chmod +x "${TEAM_AI_BIN}/${script_name}"
         fi
     done
-    print_success "Installed ai-* commands to ${AI_CENTER_BIN}"
+    print_success "Installed ai-* commands to ${TEAM_AI_BIN}"
 else
     print_error "Source bin directory not found at ${SOURCE_BIN}"
     print_warning "Scripts will need to be installed manually"
@@ -102,11 +102,11 @@ elif [ -n "${BASH_VERSION}" ] || [ "${SHELL}" = "/bin/bash" ]; then
     fi
 fi
 
-PATH_EXPORT="export PATH=\"\${HOME}/.ai-center/bin:\${PATH}\""
+PATH_EXPORT="export PATH=\"\${HOME}/.team-ai/bin:\${PATH}\""
 if [ -n "${SHELL_CONFIG}" ]; then
-    if ! grep -q "\.ai-center/bin" "${SHELL_CONFIG}" 2>/dev/null; then
+    if ! grep -q "\.team-ai/bin" "${SHELL_CONFIG}" 2>/dev/null; then
         echo "" >> "${SHELL_CONFIG}"
-        echo "# AI Center - Multi-Agent Communication System" >> "${SHELL_CONFIG}"
+        echo "# Team AI - Multi-Agent Communication System" >> "${SHELL_CONFIG}"
         echo "${PATH_EXPORT}" >> "${SHELL_CONFIG}"
         print_success "Added PATH to ${SHELL_CONFIG}"
     else
@@ -192,13 +192,13 @@ fi
 if [ "${CURSOR_DETECTED}" = true ] || [ "${VSCODE_DETECTED}" = true ] || [ "${ANTIGRAVITY_DETECTED}" = true ] || [ "${CLAUDE_DESKTOP_DETECTED}" = true ] || [ "${PERPLEXITY_DETECTED}" = true ]; then
     print_section "Installing shared MCP library"
 
-    SHARED_AI_CENTER="${AI_CENTER_DIR}/integrations/shared"
-    mkdir -p "${SHARED_AI_CENTER}"
+    SHARED_TEAM_AI="${TEAM_AI_DIR}/integrations/shared"
+    mkdir -p "${SHARED_TEAM_AI}"
 
     if [ -d "${INTEGRATIONS_DIR}/shared" ]; then
-        cp "${INTEGRATIONS_DIR}/shared"/*.js "${SHARED_AI_CENTER}/" 2>/dev/null || true
-        cp "${INTEGRATIONS_DIR}/shared/package.json" "${SHARED_AI_CENTER}/" 2>/dev/null || true
-        print_success "Installed shared MCP library to ${SHARED_AI_CENTER}"
+        cp "${INTEGRATIONS_DIR}/shared"/*.js "${SHARED_TEAM_AI}/" 2>/dev/null || true
+        cp "${INTEGRATIONS_DIR}/shared/package.json" "${SHARED_TEAM_AI}/" 2>/dev/null || true
+        print_success "Installed shared MCP library to ${SHARED_TEAM_AI}"
     fi
 fi
 
@@ -222,8 +222,8 @@ if [ "${CLAUDE_CODE_DETECTED}" = true ] && [ -d "${INTEGRATIONS_DIR}/claude-code
         print_info "Commands: /ai-register, /ai-list, /ai-send, /ai-check"
     fi
 
-    # Install helper scripts to ~/.ai-center/scripts/
-    SCRIPTS_DIR="${AI_CENTER_DIR}/scripts"
+    # Install helper scripts to ~/.team-ai/scripts/
+    SCRIPTS_DIR="${TEAM_AI_DIR}/scripts"
     mkdir -p "${SCRIPTS_DIR}"
 
     if [ -d "${INTEGRATIONS_DIR}/claude-code/scripts" ]; then
@@ -242,7 +242,7 @@ import json
 import os
 
 settings_path = os.path.expanduser("~/.claude/settings.json")
-scripts_dir = os.path.expanduser("~/.ai-center/scripts")
+scripts_dir = os.path.expanduser("~/.team-ai/scripts")
 
 with open(settings_path, 'r') as f:
     settings = json.load(f)
@@ -258,15 +258,15 @@ if 'SessionStart' not in hooks:
     added.append("SessionStart")
 
 if 'Stop' not in hooks:
-    hooks['Stop'] = [{"hooks": [{"type": "command", "command": "bash -c 'if [ -n \"$AI_CENTER_AGENT_ID\" ]; then ~/.ai-center/bin/ai-deregister \"$AI_CENTER_AGENT_ID\" 2>/dev/null; fi'"}]}]
+    hooks['Stop'] = [{"hooks": [{"type": "command", "command": "bash -c 'if [ -n \"$TEAM_AI_AGENT_ID\" ]; then ~/.team-ai/bin/ai-deregister \"$TEAM_AI_AGENT_ID\" 2>/dev/null; fi'"}]}]
     added.append("Stop")
 
 if 'UserPromptSubmit' not in hooks:
-    hooks['UserPromptSubmit'] = [{"hooks": [{"type": "command", "command": "bash -c 'if [ -n \"$AI_CENTER_AGENT_ID\" ]; then ~/.ai-center/bin/ai-heartbeat \"$AI_CENTER_AGENT_ID\" 2>/dev/null; fi'"}]}]
+    hooks['UserPromptSubmit'] = [{"hooks": [{"type": "command", "command": "bash -c 'if [ -n \"$TEAM_AI_AGENT_ID\" ]; then ~/.team-ai/bin/ai-heartbeat \"$TEAM_AI_AGENT_ID\" 2>/dev/null; fi'"}]}]
     added.append("UserPromptSubmit")
 
 if 'PostToolUse' not in hooks:
-    hooks['PostToolUse'] = [{"hooks": [{"type": "command", "command": "bash -c 'if [ -n \"$AI_CENTER_AGENT_ID\" ]; then ~/.ai-center/bin/ai-heartbeat \"$AI_CENTER_AGENT_ID\" 2>/dev/null; fi'"}]}]
+    hooks['PostToolUse'] = [{"hooks": [{"type": "command", "command": "bash -c 'if [ -n \"$TEAM_AI_AGENT_ID\" ]; then ~/.team-ai/bin/ai-heartbeat \"$TEAM_AI_AGENT_ID\" 2>/dev/null; fi'"}]}]
     added.append("PostToolUse")
 
 if added:
@@ -278,7 +278,7 @@ else:
 PYTHON
 )
             if [ "${HOOK_RESULT}" = "NONE" ]; then
-                print_info "All AI Center hooks already configured"
+                print_info "All Team AI hooks already configured"
             else
                 if echo "${HOOK_RESULT}" | grep -q "SessionStart"; then
                     print_success "Configured SessionStart hook (auto-register on session start)"
@@ -309,18 +309,18 @@ if [ "${CLAUDE_CODE_DETECTED}" = true ]; then
     print_section "Updating Claude Code instructions"
 
     CLAUDE_MD="${HOME}/.claude/CLAUDE.md"
-    AI_CENTER_SECTION="## AI Center Integration"
+    TEAM_AI_SECTION="## Team AI Integration"
 
-    # Check if AI Center section already exists
-    if [ -f "${CLAUDE_MD}" ] && grep -q "${AI_CENTER_SECTION}" "${CLAUDE_MD}" 2>/dev/null; then
-        print_info "AI Center section already exists in CLAUDE.md"
+    # Check if Team AI section already exists
+    if [ -f "${CLAUDE_MD}" ] && grep -q "${TEAM_AI_SECTION}" "${CLAUDE_MD}" 2>/dev/null; then
+        print_info "Team AI section already exists in CLAUDE.md"
     else
-        # Append AI Center section
+        # Append Team AI section
         cat >> "${CLAUDE_MD}" << 'AICENTERSECTION'
 
-## AI Center Integration
+## Team AI Integration
 
-You have access to the AI Center multi-agent communication system. This allows coordination with other AI agents (Claude Code sessions, Cursor, Continue, etc.).
+You have access to the Team AI multi-agent communication system. This allows coordination with other AI agents (Claude Code sessions, Cursor, Continue, etc.).
 
 ### Quick Commands
 
@@ -338,7 +338,7 @@ ai-send TARGET --subject "subj" --body "msg"  # Send message
 ai-check AGENT_ID    # Check messages
 ```
 
-### When to Use AI Center
+### When to Use Team AI
 
 - **Before major changes**: Check if other agents are working on related files
 - **For coordination**: Send messages to notify other agents about breaking changes
@@ -347,7 +347,7 @@ ai-check AGENT_ID    # Check messages
 
 ### Heartbeat System
 
-AI Center uses heartbeats to track agent liveness. Your Claude Code session automatically sends heartbeats:
+Team AI uses heartbeats to track agent liveness. Your Claude Code session automatically sends heartbeats:
 
 - **On session start**: Heartbeat is set when you register
 - **On each prompt**: Heartbeat is updated whenever you send a message
@@ -361,7 +361,7 @@ ai-cleanup -t 1800       # Remove agents stale for >30 minutes
 ```
 
 AICENTERSECTION
-        print_success "Added AI Center section to CLAUDE.md"
+        print_success "Added Team AI section to CLAUDE.md"
     fi
 fi
 
@@ -371,18 +371,18 @@ fi
 if [ "${CURSOR_DETECTED}" = true ] && [ -d "${INTEGRATIONS_DIR}/cursor" ]; then
     print_section "Installing Cursor integration"
 
-    CURSOR_AI_CENTER="${AI_CENTER_DIR}/integrations/cursor"
-    mkdir -p "${CURSOR_AI_CENTER}"
+    CURSOR_TEAM_AI="${TEAM_AI_DIR}/integrations/cursor"
+    mkdir -p "${CURSOR_TEAM_AI}"
 
     # Copy MCP server
     if [ -d "${INTEGRATIONS_DIR}/cursor/mcp-server" ]; then
-        cp -r "${INTEGRATIONS_DIR}/cursor/mcp-server" "${CURSOR_AI_CENTER}/"
-        print_success "Installed MCP server to ${CURSOR_AI_CENTER}/mcp-server"
+        cp -r "${INTEGRATIONS_DIR}/cursor/mcp-server" "${CURSOR_TEAM_AI}/"
+        print_success "Installed MCP server to ${CURSOR_TEAM_AI}/mcp-server"
     fi
 
     # Copy .cursorrules template
     if [ -f "${INTEGRATIONS_DIR}/cursor/.cursorrules" ]; then
-        cp "${INTEGRATIONS_DIR}/cursor/.cursorrules" "${CURSOR_AI_CENTER}/"
+        cp "${INTEGRATIONS_DIR}/cursor/.cursorrules" "${CURSOR_TEAM_AI}/"
         print_success "Installed .cursorrules template"
     fi
 
@@ -391,14 +391,14 @@ if [ "${CURSOR_DETECTED}" = true ] && [ -d "${INTEGRATIONS_DIR}/cursor" ]; then
     echo ""
     echo -e "    ${BLUE}{${NC}"
     echo -e "    ${BLUE}  \"mcpServers\": {${NC}"
-    echo -e "    ${BLUE}    \"ai-center\": {${NC}"
+    echo -e "    ${BLUE}    \"team-ai\": {${NC}"
     echo -e "    ${BLUE}      \"command\": \"node\",${NC}"
-    echo -e "    ${BLUE}      \"args\": [\"${CURSOR_AI_CENTER}/mcp-server/index.js\"]${NC}"
+    echo -e "    ${BLUE}      \"args\": [\"${CURSOR_TEAM_AI}/mcp-server/index.js\"]${NC}"
     echo -e "    ${BLUE}    }${NC}"
     echo -e "    ${BLUE}  }${NC}"
     echo -e "    ${BLUE}}${NC}"
     echo ""
-    print_info "Run 'npm install' in ${CURSOR_AI_CENTER}/mcp-server to install dependencies"
+    print_info "Run 'npm install' in ${CURSOR_TEAM_AI}/mcp-server to install dependencies"
 fi
 
 # =============================================================================
@@ -407,20 +407,20 @@ fi
 if [ "${VSCODE_DETECTED}" = true ] && [ -d "${INTEGRATIONS_DIR}/vscode" ]; then
     print_section "Installing VSCode integration"
 
-    VSCODE_AI_CENTER="${AI_CENTER_DIR}/integrations/vscode"
-    mkdir -p "${VSCODE_AI_CENTER}"
+    VSCODE_TEAM_AI="${TEAM_AI_DIR}/integrations/vscode"
+    mkdir -p "${VSCODE_TEAM_AI}"
 
     # Copy MCP server
     if [ -d "${INTEGRATIONS_DIR}/vscode/mcp-server" ]; then
-        cp -r "${INTEGRATIONS_DIR}/vscode/mcp-server" "${VSCODE_AI_CENTER}/"
-        print_success "Installed MCP server to ${VSCODE_AI_CENTER}/mcp-server"
+        cp -r "${INTEGRATIONS_DIR}/vscode/mcp-server" "${VSCODE_TEAM_AI}/"
+        print_success "Installed MCP server to ${VSCODE_TEAM_AI}/mcp-server"
     fi
 
     # Configure VSCode mcp.json (user-level)
     VSCODE_MCP_JSON="${HOME}/Library/Application Support/Code/User/mcp.json"
     if [ -f "${VSCODE_MCP_JSON}" ]; then
-        # Check if ai-center is already configured
-        if ! grep -q "ai-center" "${VSCODE_MCP_JSON}" 2>/dev/null; then
+        # Check if team-ai is already configured
+        if ! grep -q "team-ai" "${VSCODE_MCP_JSON}" 2>/dev/null; then
             if command -v python3 &> /dev/null; then
                 python3 << PYTHON
 import json
@@ -432,43 +432,43 @@ with open(mcp_path, 'r') as f:
 if 'servers' not in config:
     config['servers'] = {}
 
-config['servers']['ai-center'] = {
+config['servers']['team-ai'] = {
     "type": "stdio",
     "command": "node",
-    "args": ["${VSCODE_AI_CENTER}/mcp-server/index.js"]
+    "args": ["${VSCODE_TEAM_AI}/mcp-server/index.js"]
 }
 
 with open(mcp_path, 'w') as f:
     json.dump(config, f, indent='\t')
 PYTHON
-                print_success "Added AI Center to VSCode mcp.json"
+                print_success "Added Team AI to VSCode mcp.json"
             else
                 print_warning "Python3 not found - manual config required"
             fi
         else
-            print_info "AI Center already configured in VSCode mcp.json"
+            print_info "Team AI already configured in VSCode mcp.json"
         fi
     else
         # Create new mcp.json
         cat > "${VSCODE_MCP_JSON}" << MCPJSON
 {
 	"servers": {
-		"ai-center": {
+		"team-ai": {
 			"type": "stdio",
 			"command": "node",
-			"args": ["${VSCODE_AI_CENTER}/mcp-server/index.js"]
+			"args": ["${VSCODE_TEAM_AI}/mcp-server/index.js"]
 		}
 	},
 	"inputs": []
 }
 MCPJSON
-        print_success "Created VSCode mcp.json with AI Center"
+        print_success "Created VSCode mcp.json with Team AI"
     fi
 
     echo ""
     print_info "VSCode MCP configured at: ${VSCODE_MCP_JSON}"
     print_info "Reload VSCode to activate (Cmd+Shift+P → 'Developer: Reload Window')"
-    print_info "Run 'npm install' in ${VSCODE_AI_CENTER}/mcp-server to install dependencies"
+    print_info "Run 'npm install' in ${VSCODE_TEAM_AI}/mcp-server to install dependencies"
 fi
 
 # =============================================================================
@@ -477,23 +477,23 @@ fi
 if [ "${CONTINUE_DETECTED}" = true ] && [ -d "${INTEGRATIONS_DIR}/continue" ]; then
     print_section "Installing Continue integration"
 
-    CONTINUE_AI_CENTER="${AI_CENTER_DIR}/integrations/continue"
-    mkdir -p "${CONTINUE_AI_CENTER}"
+    CONTINUE_TEAM_AI="${TEAM_AI_DIR}/integrations/continue"
+    mkdir -p "${CONTINUE_TEAM_AI}"
 
     # Copy context provider
-    if [ -f "${INTEGRATIONS_DIR}/continue/ai-center-context.ts" ]; then
-        cp "${INTEGRATIONS_DIR}/continue/ai-center-context.ts" "${CONTINUE_AI_CENTER}/"
+    if [ -f "${INTEGRATIONS_DIR}/continue/team-ai-context.ts" ]; then
+        cp "${INTEGRATIONS_DIR}/continue/team-ai-context.ts" "${CONTINUE_TEAM_AI}/"
         print_success "Installed context provider template"
     fi
 
     echo ""
     print_info "To enable the context provider in Continue:"
-    print_info "1. Copy ${CONTINUE_AI_CENTER}/ai-center-context.ts to your Continue config"
+    print_info "1. Copy ${CONTINUE_TEAM_AI}/team-ai-context.ts to your Continue config"
     print_info "2. Add to your config.json:"
     echo ""
     echo -e "    ${BLUE}{${NC}"
     echo -e "    ${BLUE}  \"contextProviders\": [${NC}"
-    echo -e "    ${BLUE}    { \"name\": \"ai-center\" }${NC}"
+    echo -e "    ${BLUE}    { \"name\": \"team-ai\" }${NC}"
     echo -e "    ${BLUE}  ]${NC}"
     echo -e "    ${BLUE}}${NC}"
 fi
@@ -504,13 +504,13 @@ fi
 if [ "${ANTIGRAVITY_DETECTED}" = true ] || [ -d "${INTEGRATIONS_DIR}/antigravity" ]; then
     print_section "Installing Google Antigravity integration"
 
-    # Install MCP server to ~/.ai-center/integrations/antigravity (standard location)
-    ANTIGRAVITY_AI_CENTER="${AI_CENTER_DIR}/integrations/antigravity"
-    mkdir -p "${ANTIGRAVITY_AI_CENTER}"
+    # Install MCP server to ~/.team-ai/integrations/antigravity (standard location)
+    ANTIGRAVITY_TEAM_AI="${TEAM_AI_DIR}/integrations/antigravity"
+    mkdir -p "${ANTIGRAVITY_TEAM_AI}"
 
     if [ -d "${INTEGRATIONS_DIR}/antigravity/mcp-server" ]; then
-        cp -r "${INTEGRATIONS_DIR}/antigravity/mcp-server" "${ANTIGRAVITY_AI_CENTER}/"
-        print_success "Installed MCP server to ${ANTIGRAVITY_AI_CENTER}/mcp-server"
+        cp -r "${INTEGRATIONS_DIR}/antigravity/mcp-server" "${ANTIGRAVITY_TEAM_AI}/"
+        print_success "Installed MCP server to ${ANTIGRAVITY_TEAM_AI}/mcp-server"
     fi
 
     # Antigravity expects MCP config at ~/.gemini/antigravity/mcp_config.json
@@ -518,14 +518,14 @@ if [ "${ANTIGRAVITY_DETECTED}" = true ] || [ -d "${INTEGRATIONS_DIR}/antigravity
     ANTIGRAVITY_MCP_CONFIG="${ANTIGRAVITY_GEMINI_DIR}/mcp_config.json"
     mkdir -p "${ANTIGRAVITY_GEMINI_DIR}"
 
-    # Smart update: merge ai-center into existing config or create new
+    # Smart update: merge team-ai into existing config or create new
     if command -v python3 &> /dev/null; then
         python3 << PYTHON
 import json
 import os
 
 config_path = "${ANTIGRAVITY_MCP_CONFIG}"
-mcp_server_path = "${ANTIGRAVITY_AI_CENTER}/mcp-server/index.js"
+mcp_server_path = "${ANTIGRAVITY_TEAM_AI}/mcp-server/index.js"
 
 # Load existing config or start fresh
 if os.path.exists(config_path):
@@ -541,8 +541,8 @@ else:
 if 'mcpServers' not in config:
     config['mcpServers'] = {}
 
-# Add/update ai-center entry with absolute path
-config['mcpServers']['ai-center'] = {
+# Add/update team-ai entry with absolute path
+config['mcpServers']['team-ai'] = {
     "command": "node",
     "args": [mcp_server_path]
 }
@@ -552,7 +552,7 @@ with open(config_path, 'w') as f:
     json.dump(config, f, indent=2)
 PYTHON
         if [ -f "${ANTIGRAVITY_MCP_CONFIG}" ]; then
-            print_success "Updated mcp_config.json with ai-center entry"
+            print_success "Updated mcp_config.json with team-ai entry"
         fi
     else
         # Fallback: create new config if python3 not available
@@ -560,10 +560,10 @@ PYTHON
             cat > "${ANTIGRAVITY_MCP_CONFIG}" << MCPCONFIG
 {
   "mcpServers": {
-    "ai-center": {
+    "team-ai": {
       "command": "node",
       "args": [
-        "${ANTIGRAVITY_AI_CENTER}/mcp-server/index.js"
+        "${ANTIGRAVITY_TEAM_AI}/mcp-server/index.js"
       ]
     }
   }
@@ -572,13 +572,13 @@ MCPCONFIG
             print_success "Created mcp_config.json"
         else
             print_warning "Python3 not found - manual config update required"
-            print_info "Add ai-center to ${ANTIGRAVITY_MCP_CONFIG}"
+            print_info "Add team-ai to ${ANTIGRAVITY_MCP_CONFIG}"
         fi
     fi
 
     echo ""
     print_info "Antigravity MCP configured at: ${ANTIGRAVITY_MCP_CONFIG}"
-    print_info "Run 'npm install' in ${ANTIGRAVITY_AI_CENTER}/mcp-server to install dependencies"
+    print_info "Run 'npm install' in ${ANTIGRAVITY_TEAM_AI}/mcp-server to install dependencies"
 fi
 
 # =============================================================================
@@ -588,27 +588,27 @@ if [ "${CLAUDE_DESKTOP_DETECTED}" = true ]; then
     print_section "Installing Claude Desktop integration"
 
     # Claude Desktop uses the VSCode MCP server
-    VSCODE_AI_CENTER="${AI_CENTER_DIR}/integrations/vscode"
+    VSCODE_TEAM_AI="${TEAM_AI_DIR}/integrations/vscode"
 
     # Ensure MCP server is installed (may have been done by VSCode section)
-    if [ ! -d "${VSCODE_AI_CENTER}/mcp-server" ] && [ -d "${INTEGRATIONS_DIR}/vscode/mcp-server" ]; then
-        mkdir -p "${VSCODE_AI_CENTER}"
-        cp -r "${INTEGRATIONS_DIR}/vscode/mcp-server" "${VSCODE_AI_CENTER}/"
-        print_success "Installed MCP server to ${VSCODE_AI_CENTER}/mcp-server"
+    if [ ! -d "${VSCODE_TEAM_AI}/mcp-server" ] && [ -d "${INTEGRATIONS_DIR}/vscode/mcp-server" ]; then
+        mkdir -p "${VSCODE_TEAM_AI}"
+        cp -r "${INTEGRATIONS_DIR}/vscode/mcp-server" "${VSCODE_TEAM_AI}/"
+        print_success "Installed MCP server to ${VSCODE_TEAM_AI}/mcp-server"
     fi
 
     # Configure Claude Desktop config
     CLAUDE_DESKTOP_CONFIG="${HOME}/Library/Application Support/Claude/claude_desktop_config.json"
 
     if [ -f "${CLAUDE_DESKTOP_CONFIG}" ]; then
-        # Check if ai-center is already configured
-        if ! grep -q "ai-center" "${CLAUDE_DESKTOP_CONFIG}" 2>/dev/null; then
+        # Check if team-ai is already configured
+        if ! grep -q "team-ai" "${CLAUDE_DESKTOP_CONFIG}" 2>/dev/null; then
             if command -v python3 &> /dev/null; then
                 python3 << PYTHON
 import json
 
 config_path = "${CLAUDE_DESKTOP_CONFIG}"
-mcp_server_path = "${VSCODE_AI_CENTER}/mcp-server/index.js"
+mcp_server_path = "${VSCODE_TEAM_AI}/mcp-server/index.js"
 
 with open(config_path, 'r') as f:
     config = json.load(f)
@@ -617,8 +617,8 @@ with open(config_path, 'r') as f:
 if 'mcpServers' not in config:
     config['mcpServers'] = {}
 
-# Add ai-center entry
-config['mcpServers']['ai-center'] = {
+# Add team-ai entry
+config['mcpServers']['team-ai'] = {
     "command": "node",
     "args": [mcp_server_path]
 }
@@ -626,12 +626,12 @@ config['mcpServers']['ai-center'] = {
 with open(config_path, 'w') as f:
     json.dump(config, f, indent=2)
 PYTHON
-                print_success "Added AI Center to Claude Desktop config"
+                print_success "Added Team AI to Claude Desktop config"
             else
                 print_warning "Python3 not found - manual config required"
             fi
         else
-            print_info "AI Center already configured in Claude Desktop"
+            print_info "Team AI already configured in Claude Desktop"
         fi
     else
         # Create new config
@@ -641,11 +641,11 @@ import json
 import os
 
 config_path = "${CLAUDE_DESKTOP_CONFIG}"
-mcp_server_path = "${VSCODE_AI_CENTER}/mcp-server/index.js"
+mcp_server_path = "${VSCODE_TEAM_AI}/mcp-server/index.js"
 
 config = {
     "mcpServers": {
-        "ai-center": {
+        "team-ai": {
             "command": "node",
             "args": [mcp_server_path]
         }
@@ -655,7 +655,7 @@ config = {
 with open(config_path, 'w') as f:
     json.dump(config, f, indent=2)
 PYTHON
-            print_success "Created Claude Desktop config with AI Center"
+            print_success "Created Claude Desktop config with Team AI"
         else
             print_warning "Python3 not found - manual config required"
         fi
@@ -673,27 +673,27 @@ if [ "${PERPLEXITY_DETECTED}" = true ]; then
     print_section "Installing Perplexity integration"
 
     # Install Perplexity-specific MCP server
-    PERPLEXITY_AI_CENTER="${AI_CENTER_DIR}/integrations/perplexity"
-    mkdir -p "${PERPLEXITY_AI_CENTER}"
+    PERPLEXITY_TEAM_AI="${TEAM_AI_DIR}/integrations/perplexity"
+    mkdir -p "${PERPLEXITY_TEAM_AI}"
 
     if [ -d "${INTEGRATIONS_DIR}/perplexity/mcp-server" ]; then
-        cp -r "${INTEGRATIONS_DIR}/perplexity/mcp-server" "${PERPLEXITY_AI_CENTER}/"
-        print_success "Installed MCP server to ${PERPLEXITY_AI_CENTER}/mcp-server"
+        cp -r "${INTEGRATIONS_DIR}/perplexity/mcp-server" "${PERPLEXITY_TEAM_AI}/"
+        print_success "Installed MCP server to ${PERPLEXITY_TEAM_AI}/mcp-server"
     fi
 
     # Perplexity MCP is configured via UI settings (no config file)
     echo ""
     print_info "Perplexity MCP is configured via the app's UI settings."
-    print_info "To enable AI Center in Perplexity:"
+    print_info "To enable Team AI in Perplexity:"
     echo ""
     echo -e "    ${BLUE}1. Open Perplexity Settings${NC}"
     echo -e "    ${BLUE}2. Navigate to MCP settings${NC}"
     echo -e "    ${BLUE}3. Add a new local MCP server:${NC}"
     echo -e "       ${BLUE}Command: node${NC}"
-    echo -e "       ${BLUE}Args: ${PERPLEXITY_AI_CENTER}/mcp-server/index.js${NC}"
+    echo -e "       ${BLUE}Args: ${PERPLEXITY_TEAM_AI}/mcp-server/index.js${NC}"
     echo ""
     print_info "Documentation: https://www.perplexity.ai/help-center/en/articles/11502712-local-and-remote-mcps-for-perplexity"
-    print_info "Run 'npm install' in ${PERPLEXITY_AI_CENTER}/mcp-server to install dependencies"
+    print_info "Run 'npm install' in ${PERPLEXITY_TEAM_AI}/mcp-server to install dependencies"
 fi
 
 # =============================================================================
@@ -713,7 +713,7 @@ echo -e "${BLUE}═════════════════════�
 echo -e "${GREEN}  Installation Complete!${NC}"
 echo -e "${BLUE}═══════════════════════════════════════════════════════════${NC}"
 echo ""
-echo "Directory structure: ${AI_CENTER_DIR}"
+echo "Directory structure: ${TEAM_AI_DIR}"
 echo ""
 echo "Installed integrations:"
 [ "${CLAUDE_CODE_DETECTED}" = true ] && echo "  • Claude Code (full plugin support)"
@@ -725,7 +725,7 @@ echo "Installed integrations:"
 [ "${CONTINUE_DETECTED}" = true ] && echo "  • Continue (context provider)"
 [ "${COPILOT_DETECTED}" = true ] && echo "  • GitHub Copilot (shell commands only)"
 echo ""
-echo "To start using AI Center, either:"
+echo "To start using Team AI, either:"
 echo "  1. Open a new terminal, or"
 echo "  2. Run: source ${SHELL_CONFIG}"
 echo ""

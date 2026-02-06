@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
- * AI Center MCP Server for Cursor IDE
- * Provides AI Center tools to Cursor via MCP protocol
+ * Team AI MCP Server for Cursor IDE
+ * Provides Team AI tools to Cursor via MCP protocol
  */
 
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
@@ -30,7 +30,7 @@ let registeredAgentId = null;
 // Create server
 const server = new Server(
   {
-    name: "ai-center",
+    name: "team-ai",
     version: "1.0.0",
   },
   {
@@ -53,7 +53,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const result = handleToolCall(name, args, MODEL_NAME, registeredAgentId);
 
   // Track agent ID if registration was successful
-  if (name === "ai-center-register" && result.agentId) {
+  if (name === "team-ai-register" && result.agentId) {
     registeredAgentId = result.agentId;
     startHeartbeatInterval(registeredAgentId);
   }
@@ -95,7 +95,7 @@ async function main() {
 
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  console.error("AI Center MCP server running (Cursor)");
+  console.error("Team AI MCP server running (Cursor)");
 }
 
 main().catch(console.error);

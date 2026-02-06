@@ -4,14 +4,14 @@
 
 set -e
 
-AI_CENTER_DIR="${HOME}/.ai-center"
-WATCHER_PID_FILE="${AI_CENTER_DIR}/watcher.pid"
+TEAM_AI_DIR="${HOME}/.team-ai"
+WATCHER_PID_FILE="${TEAM_AI_DIR}/watcher.pid"
 
 show_help() {
     cat << EOF
 Usage: ai-watch-stop
 
-Stop the AI Center watcher daemon.
+Stop the Team AI watcher daemon.
 
 Options:
   -h, --help    Show this help message

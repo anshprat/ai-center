@@ -1,12 +1,12 @@
 ---
-description: Register this agent with AI Center for multi-agent coordination
+description: Register this agent with Team AI for multi-agent coordination
 argument-hint: [--name "agent-name"] [--tags "tag1,tag2"]
 allowed-tools:
   - Bash
 ---
-# AI Center: Register Agent
+# Team AI: Register Agent
 
-Register this Claude Code session as an agent in the AI Center system.
+Register this Claude Code session as an agent in the Team AI system.
 
 ## Instructions
 

@@ -1,19 +1,19 @@
 #!/bin/bash
-# AI Center message checker
+# Team AI message checker
 # Can be called periodically or on-demand
 
-AI_CENTER_DIR="${HOME}/.ai-center"
+TEAM_AI_DIR="${HOME}/.team-ai"
 
 # Check if agent ID is provided or set in environment
-AGENT_ID="${1:-$AI_CENTER_AGENT_ID}"
+AGENT_ID="${1:-$TEAM_AI_AGENT_ID}"
 
 if [ -z "${AGENT_ID}" ]; then
     echo "Usage: check-messages.sh AGENT_ID"
-    echo "Or set AI_CENTER_AGENT_ID environment variable"
+    echo "Or set TEAM_AI_AGENT_ID environment variable"
     exit 1
 fi
 
-AGENT_DIR="${AI_CENTER_DIR}/agents/${AGENT_ID}"
+AGENT_DIR="${TEAM_AI_DIR}/agents/${AGENT_ID}"
 
 if [ ! -d "${AGENT_DIR}" ]; then
     echo "Agent not found: ${AGENT_ID}"

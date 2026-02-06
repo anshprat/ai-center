@@ -4,7 +4,7 @@
 
 set -e
 
-AI_CENTER_DIR="${HOME}/.ai-center"
+TEAM_AI_DIR="${HOME}/.team-ai"
 
 # Get ISO 8601 timestamp
 get_timestamp() {
@@ -33,7 +33,7 @@ if [ $# -lt 1 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
 fi
 
 AGENT_ID="$1"
-AGENT_DIR="${AI_CENTER_DIR}/agents/${AGENT_ID}"
+AGENT_DIR="${TEAM_AI_DIR}/agents/${AGENT_ID}"
 METADATA_FILE="${AGENT_DIR}/metadata.json"
 
 # Validate agent exists

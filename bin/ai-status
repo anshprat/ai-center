@@ -4,7 +4,7 @@
 
 set -e
 
-AI_CENTER_DIR="${HOME}/.ai-center"
+TEAM_AI_DIR="${HOME}/.team-ai"
 
 # Get ISO 8601 timestamp
 get_timestamp() {
@@ -86,7 +86,7 @@ if [ -z "${AGENT_ID}" ]; then
     exit 1
 fi
 
-AGENT_DIR="${AI_CENTER_DIR}/agents/${AGENT_ID}"
+AGENT_DIR="${TEAM_AI_DIR}/agents/${AGENT_ID}"
 METADATA_FILE="${AGENT_DIR}/metadata.json"
 
 # Validate agent exists
@@ -178,8 +178,8 @@ fi
 
 # Also update registry state if state changed
 if [ -n "${STATE}" ]; then
-    REGISTRY_FILE="${AI_CENTER_DIR}/registry.json"
-    LOCK_DIR="${AI_CENTER_DIR}/.registry.lock"
+    REGISTRY_FILE="${TEAM_AI_DIR}/registry.json"
+    LOCK_DIR="${TEAM_AI_DIR}/.registry.lock"
 
     # Try to acquire lock (non-blocking for status updates)
     if mkdir "${LOCK_DIR}" 2>/dev/null; then

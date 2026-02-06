@@ -4,8 +4,8 @@
 
 set -e
 
-AI_CENTER_DIR="${HOME}/.ai-center"
-REGISTRY_FILE="${AI_CENTER_DIR}/registry.json"
+TEAM_AI_DIR="${HOME}/.team-ai"
+REGISTRY_FILE="${TEAM_AI_DIR}/registry.json"
 
 # Default stale threshold: 1 hour (3600 seconds)
 STALE_THRESHOLD=3600
@@ -16,7 +16,7 @@ show_help() {
     cat << EOF
 Usage: ai-cleanup [OPTIONS]
 
-Remove stale agents from the AI Center.
+Remove stale agents from the Team AI.
 
 Options:
   -t, --threshold SECONDS   Stale threshold in seconds (default: 3600 = 1 hour)
@@ -58,9 +58,9 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-# Ensure AI Center exists
-if [ ! -d "${AI_CENTER_DIR}/agents" ]; then
-    echo "No agents found (AI Center not initialized)"
+# Ensure Team AI exists
+if [ ! -d "${TEAM_AI_DIR}/agents" ]; then
+    echo "No agents found (Team AI not initialized)"
     exit 0
 fi
 
@@ -100,7 +100,7 @@ stale_names=()
 stale_ages=()
 
 # Find stale agents
-for agent_dir in "${AI_CENTER_DIR}"/agents/*/; do
+for agent_dir in "${TEAM_AI_DIR}"/agents/*/; do
     if [ -d "${agent_dir}" ]; then
         agent_id=$(basename "${agent_dir}")
         metadata_file="${agent_dir}/metadata.json"

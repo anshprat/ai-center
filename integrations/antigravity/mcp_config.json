@@ -3,7 +3,7 @@
     "ai-central": {
       "command": "node",
       "args": [
-        "~/.ai-center/integrations/antigravity/mcp-server/index.js"
+        "~/.team-ai/integrations/antigravity/mcp-server/index.js"
       ]
     }
   }

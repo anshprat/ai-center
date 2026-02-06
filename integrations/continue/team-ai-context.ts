@@ -1,7 +1,7 @@
 /**
- * AI Center Context Provider for Continue IDE
+ * Team AI Context Provider for Continue IDE
  *
- * This context provider adds AI Center awareness to Continue,
+ * This context provider adds Team AI awareness to Continue,
  * allowing it to see other registered agents and pending messages.
  *
  * Installation:
@@ -10,7 +10,7 @@
  *    {
  *      "contextProviders": [
  *        {
- *          "name": "ai-center",
+ *          "name": "team-ai",
  *          "params": {}
  *        }
  *      ]
@@ -29,8 +29,8 @@ import { existsSync, readFileSync, readdirSync } from "fs";
 import { homedir } from "os";
 import { join } from "path";
 
-const AI_CENTER_DIR = join(homedir(), ".ai-center");
-const AGENTS_DIR = join(AI_CENTER_DIR, "agents");
+const TEAM_AI_DIR = join(homedir(), ".team-ai");
+const AGENTS_DIR = join(TEAM_AI_DIR, "agents");
 
 interface AgentMetadata {
   id: string;
@@ -44,8 +44,8 @@ interface AgentMetadata {
 class AICenterContextProvider implements IContextProvider {
   get description(): ContextProviderDescription {
     return {
-      title: "ai-center",
-      displayTitle: "AI Center",
+      title: "team-ai",
+      displayTitle: "Team AI",
       description: "Multi-agent awareness and communication",
       type: "submenu",
     };
@@ -97,9 +97,9 @@ class AICenterContextProvider implements IContextProvider {
 
     // Add overview item
     items.push({
-      id: "ai-center-overview",
+      id: "team-ai-overview",
       name: "Overview",
-      description: "AI Center system overview",
+      description: "Team AI system overview",
     });
 
     // Add each agent as a submenu item
@@ -122,10 +122,10 @@ class AICenterContextProvider implements IContextProvider {
   ): Promise<ContextItem[]> {
     const items: ContextItem[] = [];
 
-    if (query === "ai-center-overview" || query === "") {
+    if (query === "team-ai-overview" || query === "") {
       // Return overview
       const agents = this.getAgents();
-      let content = `# AI Center Overview\n\n`;
+      let content = `# Team AI Overview\n\n`;
       content += `**Registered Agents:** ${agents.length}\n\n`;
 
       if (agents.length > 0) {
@@ -147,7 +147,7 @@ class AICenterContextProvider implements IContextProvider {
       content += `- \`ai-check AGENT_ID\`: Check messages\n`;
 
       items.push({
-        name: "AI Center Overview",
+        name: "Team AI Overview",
         description: "Multi-agent system status",
         content,
       });

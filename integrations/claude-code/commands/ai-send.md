@@ -4,7 +4,7 @@ argument-hint: <target-agent> --subject "subject" --body "message"
 allowed-tools:
   - Bash
 ---
-# AI Center: Send Message
+# Team AI: Send Message
 
 Send a message to another agent's inbox.
 

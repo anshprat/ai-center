@@ -1,5 +1,5 @@
 /**
- * AI Center MCP Tools - Shared library for MCP server implementations
+ * Team AI MCP Tools - Shared library for MCP server implementations
  * Used by Cursor, VSCode, Antigravity, and other MCP-compatible clients
  */
 
@@ -9,8 +9,8 @@ import { homedir } from "os";
 import { join, basename } from "path";
 import { randomUUID } from "crypto";
 
-export const AI_CENTER_DIR = join(homedir(), ".ai-center");
-export const ARTIFACTS_DIR = join(AI_CENTER_DIR, "artifacts");
+export const TEAM_AI_DIR = join(homedir(), ".team-ai");
+export const ARTIFACTS_DIR = join(TEAM_AI_DIR, "artifacts");
 
 // Heartbeat interval reference (for cleanup)
 let heartbeatIntervalId = null;
@@ -25,7 +25,7 @@ export function runCommand(command, args = []) {
     const result = execSync(fullCommand, {
       encoding: "utf-8",
       timeout: 30000,
-      env: { ...process.env, PATH: `${AI_CENTER_DIR}/bin:${process.env.PATH}` },
+      env: { ...process.env, PATH: `${TEAM_AI_DIR}/bin:${process.env.PATH}` },
     });
     return { success: true, output: result.trim() };
   } catch (error) {
@@ -45,9 +45,9 @@ export function getToolDefinitions(clientType = "client") {
   return [
     // Core tools (existing)
     {
-      name: "ai-center-list",
+      name: "team-ai-list",
       description:
-        "List all registered AI agents in the AI Center. Shows agent IDs, names, states, and current tasks.",
+        "List all registered AI agents in the Team AI. Shows agent IDs, names, states, and current tasks.",
       inputSchema: {
         type: "object",
         properties: {
@@ -65,9 +65,9 @@ export function getToolDefinitions(clientType = "client") {
       },
     },
     {
-      name: "ai-center-register",
+      name: "team-ai-register",
       description:
-        "Register this session as an agent in the AI Center for multi-agent coordination.",
+        "Register this session as an agent in the Team AI for multi-agent coordination.",
       inputSchema: {
         type: "object",
         properties: {
@@ -93,7 +93,7 @@ export function getToolDefinitions(clientType = "client") {
       },
     },
     {
-      name: "ai-center-send",
+      name: "team-ai-send",
       description: "Send a message to another AI agent's inbox.",
       inputSchema: {
         type: "object",
@@ -131,7 +131,7 @@ export function getToolDefinitions(clientType = "client") {
       },
     },
     {
-      name: "ai-center-check",
+      name: "team-ai-check",
       description: "Check for incoming messages in an agent's inbox.",
       inputSchema: {
         type: "object",
@@ -150,8 +150,8 @@ export function getToolDefinitions(clientType = "client") {
       },
     },
     {
-      name: "ai-center-status",
-      description: "Get the current status of AI Center installation.",
+      name: "team-ai-status",
+      description: "Get the current status of Team AI installation.",
       inputSchema: {
         type: "object",
         properties: {},
@@ -159,7 +159,7 @@ export function getToolDefinitions(clientType = "client") {
     },
     // New tools
     {
-      name: "ai-center-agents-by-capability",
+      name: "team-ai-agents-by-capability",
       description: "Find agents with specific capabilities (e.g., 'typescript', 'python', 'frontend').",
       inputSchema: {
         type: "object",
@@ -173,7 +173,7 @@ export function getToolDefinitions(clientType = "client") {
       },
     },
     {
-      name: "ai-center-broadcast",
+      name: "team-ai-broadcast",
       description: "Send a message to multiple agents at once (all active agents or filtered by tags/capabilities).",
       inputSchema: {
         type: "object",
@@ -216,7 +216,7 @@ export function getToolDefinitions(clientType = "client") {
       },
     },
     {
-      name: "ai-center-watch-start",
+      name: "team-ai-watch-start",
       description: "Start watching for incoming messages in background. Returns immediately.",
       inputSchema: {
         type: "object",
@@ -247,7 +247,7 @@ export function getToolDefinitions(clientType = "client") {
 export function handleToolCall(name, args, modelName, registeredAgentId = null) {
   try {
     switch (name) {
-      case "ai-center-list": {
+      case "team-ai-list": {
         const cmdArgs = [];
         if (args?.all) cmdArgs.push("--all");
         if (args?.verbose) cmdArgs.push("--verbose");
@@ -265,7 +265,7 @@ export function handleToolCall(name, args, modelName, registeredAgentId = null) 
         };
       }
 
-      case "ai-center-register": {
+      case "team-ai-register": {
         const cmdArgs = [
           "--name",
           `"${args.name}"`,
@@ -285,7 +285,7 @@ export function handleToolCall(name, args, modelName, registeredAgentId = null) 
             content: [
               {
                 type: "text",
-                text: `Successfully registered as agent: ${agentId}\n\nUse this ID to check messages: ai-center-check with agentId="${agentId}"`,
+                text: `Successfully registered as agent: ${agentId}\n\nUse this ID to check messages: team-ai-check with agentId="${agentId}"`,
               },
             ],
             agentId: agentId, // Return for tracking
@@ -301,7 +301,7 @@ export function handleToolCall(name, args, modelName, registeredAgentId = null) 
         };
       }
 
-      case "ai-center-send": {
+      case "team-ai-send": {
         const cmdArgs = [
           args.target,
           "--subject",
@@ -326,7 +326,7 @@ export function handleToolCall(name, args, modelName, registeredAgentId = null) 
         };
       }
 
-      case "ai-center-check": {
+      case "team-ai-check": {
         const cmdArgs = [args.agentId];
         if (args?.all) cmdArgs.push("--all");
 
@@ -343,13 +343,13 @@ export function handleToolCall(name, args, modelName, registeredAgentId = null) 
         };
       }
 
-      case "ai-center-status": {
-        const installed = existsSync(AI_CENTER_DIR);
-        const binExists = existsSync(join(AI_CENTER_DIR, "bin"));
+      case "team-ai-status": {
+        const installed = existsSync(TEAM_AI_DIR);
+        const binExists = existsSync(join(TEAM_AI_DIR, "bin"));
         const artifactsExists = existsSync(ARTIFACTS_DIR);
 
         let agentCount = 0;
-        const agentsDir = join(AI_CENTER_DIR, "agents");
+        const agentsDir = join(TEAM_AI_DIR, "agents");
         if (existsSync(agentsDir)) {
           agentCount = readdirSync(agentsDir).filter((f) =>
             existsSync(join(agentsDir, f, "metadata.json"))
@@ -360,20 +360,20 @@ export function handleToolCall(name, args, modelName, registeredAgentId = null) 
           content: [
             {
               type: "text",
-              text: `AI Center Status:
+              text: `Team AI Status:
 - Installed: ${installed ? "Yes" : "No"}
 - Bin directory: ${binExists ? "Yes" : "No"}
 - Artifacts directory: ${artifactsExists ? "Yes" : "No"}
-- Directory: ${AI_CENTER_DIR}
+- Directory: ${TEAM_AI_DIR}
 - Registered agents: ${agentCount}`,
             },
           ],
         };
       }
 
-      case "ai-center-agents-by-capability": {
+      case "team-ai-agents-by-capability": {
         const capability = args.capability.toLowerCase();
-        const agentsDir = join(AI_CENTER_DIR, "agents");
+        const agentsDir = join(TEAM_AI_DIR, "agents");
         const matchingAgents = [];
 
         if (existsSync(agentsDir)) {
@@ -425,8 +425,8 @@ export function handleToolCall(name, args, modelName, registeredAgentId = null) 
         };
       }
 
-      case "ai-center-broadcast": {
-        const agentsDir = join(AI_CENTER_DIR, "agents");
+      case "team-ai-broadcast": {
+        const agentsDir = join(TEAM_AI_DIR, "agents");
         const targetAgents = [];
 
         if (existsSync(agentsDir)) {
@@ -509,7 +509,7 @@ export function handleToolCall(name, args, modelName, registeredAgentId = null) 
         };
       }
 
-      case "ai-center-watch-start": {
+      case "team-ai-watch-start": {
         const cmdArgs = [args.agentId, "--daemon"];
         if (args.interval) cmdArgs.push("--interval", String(args.interval));
 
@@ -573,12 +573,12 @@ export function autoRegister(modelName, clientName) {
 
     if (result.success) {
       const agentId = result.output.trim();
-      console.error(`AI Center: Registered as ${agentName} (${agentId})`);
+      console.error(`Team AI: Registered as ${agentName} (${agentId})`);
       return { agentId, agentName };
     }
     return { agentId: null, agentName };
   } catch (error) {
-    console.error("AI Center: Auto-registration failed:", error.message);
+    console.error("Team AI: Auto-registration failed:", error.message);
     return { agentId: null, agentName: "" };
   }
 }
@@ -592,7 +592,7 @@ export function autoDeregister(agentId) {
     try {
       stopHeartbeatInterval(); // Stop heartbeat before deregistering
       runCommand("ai-deregister", [agentId]);
-      console.error(`AI Center: Deregistered ${agentId}`);
+      console.error(`Team AI: Deregistered ${agentId}`);
     } catch (error) {
       // Ignore errors on cleanup
     }
@@ -611,7 +611,7 @@ export function updateHeartbeat(agentId) {
     const result = runCommand("ai-heartbeat", [agentId]);
     return result.success;
   } catch (error) {
-    console.error("AI Center: Heartbeat update failed:", error.message);
+    console.error("Team AI: Heartbeat update failed:", error.message);
     return false;
   }
 }
@@ -636,7 +636,7 @@ export function startHeartbeatInterval(agentId, intervalMs = DEFAULT_HEARTBEAT_I
     updateHeartbeat(agentId);
   }, intervalMs);
 
-  console.error(`AI Center: Started heartbeat (every ${intervalMs / 1000}s)`);
+  console.error(`Team AI: Started heartbeat (every ${intervalMs / 1000}s)`);
   return true;
 }
 

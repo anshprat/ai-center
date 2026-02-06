@@ -1,4 +1,4 @@
-# AI Center - Multi-Agent Communication System
+# Team AI - Multi-Agent Communication System
 
 A file-based inter-agent communication system that allows multiple AI agents to coordinate and communicate across different IDEs and tools.
 
@@ -24,8 +24,8 @@ A file-based inter-agent communication system that allows multiple AI agents to 
 ```
 
 This will:
-1. Create the `~/.ai-center/` directory structure
-2. Copy scripts to `~/.ai-center/bin/`
+1. Create the `~/.team-ai/` directory structure
+2. Copy scripts to `~/.team-ai/bin/`
 3. Add the bin directory to your PATH
 
 After installation, either open a new terminal or run:
@@ -105,7 +105,7 @@ ai-deregister $AGENT_ID
 ## Directory Structure
 
 ```
-~/.ai-center/
+~/.team-ai/
 ├── bin/                        # CLI scripts
 ├── agents/
 │   └── <agent-id>/
@@ -281,19 +281,19 @@ The MCP server integrations provide the following tools:
 
 | Tool | Description |
 |------|-------------|
-| `ai-center-list` | List all registered agents |
-| `ai-center-register` | Register this session as an agent |
-| `ai-center-send` | Send message to another agent |
-| `ai-center-check` | Check incoming messages |
-| `ai-center-status` | Get AI Center installation status |
-| `ai-center-agents-by-capability` | Find agents with specific capabilities |
-| `ai-center-broadcast` | Send message to multiple agents |
-| `ai-center-watch-start` | Start watching for incoming messages |
+| `team-ai-list` | List all registered agents |
+| `team-ai-register` | Register this session as an agent |
+| `team-ai-send` | Send message to another agent |
+| `team-ai-check` | Check incoming messages |
+| `team-ai-status` | Get Team AI installation status |
+| `team-ai-agents-by-capability` | Find agents with specific capabilities |
+| `team-ai-broadcast` | Send message to multiple agents |
+| `team-ai-watch-start` | Start watching for incoming messages |
 
 ### Setting up Google Antigravity
 
 1. Run `./install.sh` to install the MCP server
-2. Run `npm install` in `~/.ai-center/integrations/antigravity/mcp-server/`
+2. Run `npm install` in `~/.team-ai/integrations/antigravity/mcp-server/`
 3. Restart Antigravity
 
 The installer automatically creates/updates `~/.gemini/antigravity/mcp_config.json` with absolute paths, preserving any existing MCP server configurations.
@@ -315,7 +315,7 @@ type: request
 artifacts:
   - type: screenshot
     id: artifact-uuid
-    path: ~/.ai-center/artifacts/artifact-uuid.png
+    path: ~/.team-ai/artifacts/artifact-uuid.png
 ---
 
 # Subject: Brief title
@@ -332,7 +332,7 @@ What kind of response is expected
 ## Attached Artifact
 - **Type:** screenshot
 - **ID:** artifact-uuid
-- **Path:** ~/.ai-center/artifacts/artifact-uuid.png
+- **Path:** ~/.team-ai/artifacts/artifact-uuid.png
 ```
 
 ### Artifact Types
@@ -379,7 +379,7 @@ ai-watch $FRONTEND_ID
 
 ## Heartbeat System
 
-AI Center uses heartbeats to track agent liveness and automatically clean up stale agents.
+Team AI uses heartbeats to track agent liveness and automatically clean up stale agents.
 
 ### Automatic Heartbeat
 

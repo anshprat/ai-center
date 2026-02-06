@@ -4,7 +4,7 @@
 
 set -e
 
-AI_CENTER_DIR="${HOME}/.ai-center"
+TEAM_AI_DIR="${HOME}/.team-ai"
 
 show_help() {
     cat << EOF
@@ -57,7 +57,7 @@ if [ -z "${AGENT_ID}" ] || [ -z "${MESSAGE_FILE}" ]; then
     exit 1
 fi
 
-AGENT_DIR="${AI_CENTER_DIR}/agents/${AGENT_ID}"
+AGENT_DIR="${TEAM_AI_DIR}/agents/${AGENT_ID}"
 TODO_DIR="${AGENT_DIR}/incoming/todo"
 WIP_DIR="${AGENT_DIR}/incoming/wip"
 

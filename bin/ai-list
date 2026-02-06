@@ -4,8 +4,8 @@
 
 set -e
 
-AI_CENTER_DIR="${HOME}/.ai-center"
-REGISTRY_FILE="${AI_CENTER_DIR}/registry.json"
+TEAM_AI_DIR="${HOME}/.team-ai"
+REGISTRY_FILE="${TEAM_AI_DIR}/registry.json"
 
 # Options
 SHOW_ALL=false
@@ -16,7 +16,7 @@ show_help() {
     cat << EOF
 Usage: ai-list [OPTIONS]
 
-List all registered agents in the AI Center.
+List all registered agents in the Team AI.
 
 Options:
   -a, --all       Show all agents including completed/stale
@@ -59,9 +59,9 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-# Ensure AI Center exists
-if [ ! -d "${AI_CENTER_DIR}/agents" ]; then
-    echo "No agents found (AI Center not initialized)" >&2
+# Ensure Team AI exists
+if [ ! -d "${TEAM_AI_DIR}/agents" ]; then
+    echo "No agents found (Team AI not initialized)" >&2
     exit 0
 fi
 
@@ -104,8 +104,8 @@ import json
 import os
 import sys
 
-ai_center = os.path.expanduser('~/.ai-center')
-agents_dir = os.path.join(ai_center, 'agents')
+team_ai = os.path.expanduser('~/.team-ai')
+agents_dir = os.path.join(team_ai, 'agents')
 show_all = 'SHOW_ALL' in os.environ and os.environ.get('SHOW_ALL') == 'true'
 
 agents = []
@@ -131,7 +131,7 @@ agent_count=0
 printf "%-36s  %-15s  %-10s  %-8s  %s\n" "ID" "NAME" "STATE" "HEARTBEAT" "TASK"
 printf "%s\n" "$(printf '%.0s-' {1..100})"
 
-for agent_dir in "${AI_CENTER_DIR}"/agents/*/; do
+for agent_dir in "${TEAM_AI_DIR}"/agents/*/; do
     if [ -d "${agent_dir}" ]; then
         agent_id=$(basename "${agent_dir}")
         metadata_file="${agent_dir}/metadata.json"

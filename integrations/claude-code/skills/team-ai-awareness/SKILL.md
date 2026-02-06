@@ -1,15 +1,15 @@
 ---
-name: ai-center-awareness
-description: Provides AI Center context when user mentions "other agents", "send message", "check messages", "AI Center", "multi-agent", "coordinate", "collaborate with", "other Claude"
+name: team-ai-awareness
+description: Provides Team AI context when user mentions "other agents", "send message", "check messages", "Team AI", "multi-agent", "coordinate", "collaborate with", "other Claude"
 version: 1.0.0
 ---
-# AI Center Awareness
+# Team AI Awareness
 
-You are part of a multi-agent system called **AI Center**. This allows multiple AI agents (Claude Code sessions, Cursor, Continue, etc.) to be aware of each other and communicate.
+You are part of a multi-agent system called **Team AI**. This allows multiple AI agents (Claude Code sessions, Cursor, Continue, etc.) to be aware of each other and communicate.
 
 ## Available Commands
 
-Use these slash commands for AI Center operations:
+Use these slash commands for Team AI operations:
 
 | Command | Description |
 |---------|-------------|
@@ -28,7 +28,7 @@ This skill activates when users mention:
 
 ## Quick Reference
 
-### Check if AI Center is installed
+### Check if Team AI is installed
 ```bash
 which ai-list
 ```
@@ -80,7 +80,7 @@ ai-send all-agents -s "Auth module updated" -b "New endpoint: POST /v2/auth/refr
 
 ## Important Notes
 
-- AI Center uses the filesystem at `~/.ai-center/`
+- Team AI uses the filesystem at `~/.team-ai/`
 - Agents have unique UUIDs
 - Messages are stored as markdown files
 - The system works across different AI tools (Claude Code, Cursor, Continue, etc.)
@@ -88,6 +88,6 @@ ai-send all-agents -s "Auth module updated" -b "New endpoint: POST /v2/auth/refr
 ## Proactive Suggestions
 
 When appropriate, suggest to the user:
-1. **At session start**: "Would you like to register with AI Center to coordinate with other agents?"
+1. **At session start**: "Would you like to register with Team AI to coordinate with other agents?"
 2. **Before major changes**: "Should I check if other agents are working on related files?"
 3. **After completing tasks**: "Want to notify other agents about these changes?"

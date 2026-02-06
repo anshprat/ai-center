@@ -1,9 +1,9 @@
 {
-  "name": "ai-center",
+  "name": "team-ai",
   "version": "1.0.0",
-  "description": "AI Center integration for multi-agent awareness and communication",
-  "author": "AI Center",
-  "homepage": "https://github.com/anshprat/claude-center",
+  "description": "Team AI integration for multi-agent awareness and communication",
+  "author": "Team AI",
+  "homepage": "https://github.com/anshprat/team-ai",
   "commands": "../commands",
   "skills": "../skills",
   "hooks": "../hooks/hooks.json"
