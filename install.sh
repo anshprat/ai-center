@@ -235,10 +235,12 @@ if [ "${CLAUDE_CODE_DETECTED}" = true ] && [ -d "${INTEGRATIONS_DIR}/claude-code
         print_success "Installed helper scripts to ${SCRIPTS_DIR}"
     fi
 
-    # Configure SessionStart and Stop hooks in ~/.claude/settings.json
+    # Configure Team AI hooks in ~/.claude/settings.json. Each Team AI hook
+    # is appended as its own entry (preserving any existing hooks for the
+    # same event), and re-running the installer is idempotent (we de-dupe
+    # by command string).
     CLAUDE_SETTINGS="${HOME}/.claude/settings.json"
     if [ -f "${CLAUDE_SETTINGS}" ]; then
-        # Use python to intelligently merge hooks into existing settings
         if command -v python3 &> /dev/null; then
             HOOK_RESULT=$(python3 << 'PYTHON'
 import json
@@ -247,54 +249,86 @@ import os
 settings_path = os.path.expanduser("~/.claude/settings.json")
 scripts_dir = os.path.expanduser("~/.team-ai/scripts")
 
+# (event_name, command, status_label)
+desired = [
+    ("SessionStart",     f"bash {scripts_dir}/session-start.sh", "auto-register on session start"),
+    ("UserPromptSubmit", f"bash {scripts_dir}/heartbeat.sh",     "heartbeat on each prompt"),
+    ("PostToolUse",      f"bash {scripts_dir}/heartbeat.sh",     "heartbeat on each tool call"),
+    ("Stop",             f"bash {scripts_dir}/heartbeat.sh",     "heartbeat on assistant stop"),
+    ("SessionEnd",       f"bash {scripts_dir}/session-end.sh",   "auto-deregister on session end"),
+]
+
+# Legacy commands that earlier installer versions wrote. Strip them out so
+# upgrades don't leave stale entries hanging around.
+legacy_substrings = [
+    "ai-deregister \"$TEAM_AI_AGENT_ID\"",
+    "ai-heartbeat \"$TEAM_AI_AGENT_ID\"",
+]
+
 with open(settings_path, 'r') as f:
     settings = json.load(f)
 
-if 'hooks' not in settings:
-    settings['hooks'] = {}
-
-hooks = settings['hooks']
+hooks = settings.setdefault('hooks', {})
 added = []
+removed_legacy = False
 
-if 'SessionStart' not in hooks:
-    hooks['SessionStart'] = [{"hooks": [{"type": "command", "command": f"bash {scripts_dir}/session-start.sh"}]}]
-    added.append("SessionStart")
+def entry_has_command(entry, cmd):
+    for h in entry.get('hooks', []) or []:
+        if h.get('command') == cmd:
+            return True
+    return False
 
-if 'Stop' not in hooks:
-    hooks['Stop'] = [{"hooks": [{"type": "command", "command": "bash -c 'if [ -n \"$TEAM_AI_AGENT_ID\" ]; then ~/.team-ai/bin/ai-deregister \"$TEAM_AI_AGENT_ID\" 2>/dev/null; fi'"}]}]
-    added.append("Stop")
+def entry_has_legacy(entry):
+    for h in entry.get('hooks', []) or []:
+        c = h.get('command') or ""
+        if any(s in c for s in legacy_substrings):
+            return True
+    return False
 
-if 'UserPromptSubmit' not in hooks:
-    hooks['UserPromptSubmit'] = [{"hooks": [{"type": "command", "command": "bash -c 'if [ -n \"$TEAM_AI_AGENT_ID\" ]; then ~/.team-ai/bin/ai-heartbeat \"$TEAM_AI_AGENT_ID\" 2>/dev/null; fi'"}]}]
-    added.append("UserPromptSubmit")
+for event, cmd, _ in desired:
+    arr = hooks.setdefault(event, [])
 
-if 'PostToolUse' not in hooks:
-    hooks['PostToolUse'] = [{"hooks": [{"type": "command", "command": "bash -c 'if [ -n \"$TEAM_AI_AGENT_ID\" ]; then ~/.team-ai/bin/ai-heartbeat \"$TEAM_AI_AGENT_ID\" 2>/dev/null; fi'"}]}]
-    added.append("PostToolUse")
+    # Drop any legacy Team AI entries for this event.
+    new_arr = [e for e in arr if not entry_has_legacy(e)]
+    if len(new_arr) != len(arr):
+        removed_legacy = True
+    arr = new_arr
+    hooks[event] = arr
 
-if added:
+    # Skip if our command is already wired up.
+    if any(entry_has_command(e, cmd) for e in arr):
+        continue
+
+    arr.append({"hooks": [{"type": "command", "command": cmd}]})
+    added.append(event)
+
+if added or removed_legacy:
     with open(settings_path, 'w') as f:
         json.dump(settings, f, indent=2)
-    print(",".join(added))
-else:
-    print("NONE")
+
+print(",".join(added) if added else "NONE")
+if removed_legacy:
+    print("LEGACY_REMOVED")
 PYTHON
 )
-            if [ "${HOOK_RESULT}" = "NONE" ]; then
+            FIRST_LINE="$(echo "${HOOK_RESULT}" | head -n 1)"
+            if [ "${FIRST_LINE}" = "NONE" ]; then
                 print_info "All Team AI hooks already configured"
             else
-                if echo "${HOOK_RESULT}" | grep -q "SessionStart"; then
-                    print_success "Configured SessionStart hook (auto-register on session start)"
-                fi
-                if echo "${HOOK_RESULT}" | grep -q "Stop"; then
-                    print_success "Configured Stop hook (auto-deregister on session end)"
-                fi
-                if echo "${HOOK_RESULT}" | grep -q "UserPromptSubmit"; then
-                    print_success "Configured UserPromptSubmit hook (heartbeat on each prompt)"
-                fi
-                if echo "${HOOK_RESULT}" | grep -q "PostToolUse"; then
-                    print_success "Configured PostToolUse hook (heartbeat on each tool call)"
-                fi
+                for event in SessionStart UserPromptSubmit PostToolUse Stop SessionEnd; do
+                    if echo "${FIRST_LINE}" | grep -q "${event}"; then
+                        case "${event}" in
+                            SessionStart)     print_success "Configured SessionStart hook (auto-register on session start)" ;;
+                            UserPromptSubmit) print_success "Configured UserPromptSubmit hook (heartbeat on each prompt)" ;;
+                            PostToolUse)      print_success "Configured PostToolUse hook (heartbeat on each tool call)" ;;
+                            Stop)             print_success "Configured Stop hook (heartbeat on assistant stop)" ;;
+                            SessionEnd)       print_success "Configured SessionEnd hook (auto-deregister on session end)" ;;
+                        esac
+                    fi
+                done
+            fi
+            if echo "${HOOK_RESULT}" | grep -q "LEGACY_REMOVED"; then
+                print_info "Removed legacy Team AI hook entries"
             fi
         else
             print_warning "Python3 not found - hooks not configured automatically"
